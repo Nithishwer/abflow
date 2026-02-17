@@ -5,6 +5,18 @@ abfe/__init__.py
 abfe/analyse_abfe.py
 abfe/setup_abfe_simulations.py
 abfe/setup_vanilla_simulations.py
+abfe/tests/__init__.py
+abfe/tests/datafiles.py
+abfe/tests/test_setup_abfe.py
+abfe/tests/test_setup_vanilla.py
+abfe/tests/test_data/__init__.py
+abfe/tests/test_data/vanilla_input/__init__.py
+abfe/tests/test_data/vanilla_input/system_setup/__init__.py
+abfe/tests/test_data/vanilla_input/system_setup/charmm/align_ligs2charmm.py
+abfe/tests/test_data/vanilla_input/system_setup/charmm/charmm-gui-3333800174 3/addCrystPdb.py
+abfe/tests/test_data/vanilla_input/system_setup/charmm/charmm-gui-3333800174 3/checkfft.py
+abfe/tests/test_data/vanilla_input/system_setup/charmm/charmm-gui-3333800174 3/findrings.py
+abfe/tests/test_data/vanilla_input/system_setup/charmm/charmm-gui-3333800174 3/pentest.py
 abfe/utils/__init__.py
 abfe/utils/abfe_helpers_hrex.py
 abfe/utils/abfe_helpers_hrex_refactored.py
@@ -15,6 +27,7 @@ abfe/utils/gromacs_helpers_single_chain.py
 abfe/utils/ligand_only_setup.py
 abfe/utils/smirnoff_param_func.py
 abfe/utils/utils.py
+abfe/utils/water_deletor.pl
 abfe/utils/cluster/__init__.py
 abfe/utils/cluster/job_script_template/__init__.py
 abfe/utils/cluster/job_script_template/abfe/job_complex_archer_hrex_cont_template.sh
@@ -158,4 +171,3 @@ abflow.egg-info/SOURCES.txt
 abflow.egg-info/dependency_links.txt
 abflow.egg-info/requires.txt
 abflow.egg-info/top_level.txt
-tests/test_setup_vanilla.py

@@ -22,7 +22,7 @@ class ABFEAnalyzer:
         self.abfe_replicates = abfe_replicates
         self.ignore_folders = ignore_folders or []
         self.legs_config = legs_config or {
-            "complex": {"bonded": 11, "coul": 10, "vdw": 21},
+            "complex": {"rest": 11, "coul": 10, "vdw": 21},
             "ligand": {"coul": 11, "vdw": 21},
         }
         self.temperature = temperature
@@ -100,14 +100,15 @@ class ABFEAnalyzer:
 
     @staticmethod
     def extract_dG_from_summary(filepath: str, leg: str, stage: str) -> List[float]:
-        df = pd.read_csv(filepath)
-        df.columns = ["PROCESS", "ID", "MBAR", "MBAR_Error", "BAR", "BAR_Error", "TI", "TI_Error"]
+        # Skip the first row to avoid the (0,0,1) orientation tuple
+        df = pd.read_csv(filepath, skiprows=1)
+        df.columns = ["PROCESS", "ID", "MBAR", "MBAR_Error",
+                    "BAR", "BAR_Error", "TI", "TI_Error"]
         matching = df[df["ID"] == leg]
-
         if matching.empty:
             raise ValueError(f"No matching ID='{leg}' found in {filepath}")
         if len(matching) > 1:
-            raise ValueError(f"Multiple rows found for ID='{leg}' in {filepath}. Please ensure unique IDs.")
+            raise ValueError(f"Multiple rows found for ID='{leg}' in {filepath}.")
 
         row = matching.squeeze()
         return [f"{stage}_{leg}"] + row.iloc[2:].astype(float).tolist()

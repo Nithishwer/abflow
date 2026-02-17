@@ -1,8 +1,4 @@
 # ABFE_Package
-Code for setting up and running replica ABFE simulations
-Got it — here’s a clean README section with just your **install from source** steps:
-
----
 
 ## Install from Source
 
@@ -23,6 +19,7 @@ conda activate abflow
 3. **Install `MDRestraintsGenerator`**
 
 ```bash
+mkdir src
 cd src
 git clone https://github.com/Nithishwer/MDRestraintsGenerator.git
 cd MDRestraintsGenerator
@@ -32,7 +29,7 @@ pip install --no-deps .
 4. **Install this repository**
 
 ```bash
-cd ..
+cd ../../
 pip install .
 ```
 
@@ -50,7 +47,6 @@ MDRestraintsGenerator package needs to be installed with no-dependencies flag to
 cd ~/Documents/abflow/src  # or wherever you keep your editable sources
 git clone https://github.com/Nithishwer/MDRestraintsGenerator.git
 cd MDRestraintsGenerator
-git checkout 03914398839e9cf912b6da2a4e04ce29b09b69c0
 pip install --no-deps -e .
 ```
 
@@ -115,7 +111,7 @@ from abfe.utils.ligand_only_setup import LigandOnlySetup
 from pathlib import Path
 import logging
 
-# --- 🔧 Define base path and ligand names (EDIT THIS ONLY) ---
+# --- Define base path and ligand names (EDIT THIS ONLY) ---
 base_path = "/ABS/PATH/TO/WORKDIR"
 ligands = ["Ligand1", "Ligand2"]  # Each should be a subfolder under base_path
 
@@ -170,7 +166,7 @@ The `ABFEAnalyzer` class performs automated analysis of complex-leg and ligand-o
 ```python
 from abfe.analyse_abfe import ABFEAnalyzer
 
-# --- 🔧 Define your system path and ligands ---
+# --- Define your system path and ligands ---
 base_path = "/ABS/PATH/TO/WORKDIR"  # Folder containing all ligand folders
 ligand_folders = ["Ligand1", "Ligand2"]  # Replace with your actual ligand folder names
 n_replicates = 3  # Number of ABFE replicates per ligand

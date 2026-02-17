@@ -1,2 +1,5 @@
-# Ignore test data
-abfe/tests/test_data/
+# Ignore local copy of MDRestraintsGenerator
+src/MDRestraintsGenerator/
+
+
+abfe/tests/test_data/abfe_analysis_input

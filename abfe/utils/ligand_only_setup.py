@@ -213,7 +213,6 @@ class LigandOnlySetup:
         """Create FEP simulation directories and write templated MDP files using soluble system templates."""
         leg_windows = {
             "coul": 11,
-            "rest": 12,
             "vdw": 21
         }
         stages = ["enmin", "npt_b", "npt_pr", "nvt", "prod"]
@@ -255,11 +254,14 @@ class LigandOnlySetup:
 
 
     def _generate_submission_script(self):
-        archer_nodes = 1
+        print(f"DEBUG: Using job script template: {self.template_script}")
+        print(f"DEBUG: Exists? {self.template_script.exists()}")
         dst = self.lig_dir / "job_lig_archer.sh"
         with open(self.template_script, "r") as file:
             filedata = file.read()
         filedata = filedata.replace("JOBNAME", f"lig{self.ligand_name}")
-        filedata = filedata.replace("NO_OF_NODES", str(archer_nodes))
+        filedata = filedata.replace("NO_OF_NODES", str(1))
         with open(dst, "w") as file:
             file.write(filedata)
+        print(f"DEBUG: Wrote job script to {dst}")
+

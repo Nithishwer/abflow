@@ -28,6 +28,7 @@ include = ["abfe*"]
 
 # Include all .sh files in all subfolders of job_script_template
 "abfe.utils.cluster.job_script_template" = ["**/*.sh"]
+"abfe.utils.cluster.job_script_template.abfe_ligonly" = ["*.sh"] 
 
 # Include all .mdp files in all mdps subfolders
 "abfe.utils.data.mdps" = ["**/*.mdp"]

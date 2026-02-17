@@ -1,0 +1,325 @@
+                      :-) GROMACS - gmx grompp, 2023.1 (-:
+
+Executable:   /apps/software/GROMACS/2023.1-foss-2022a-CUDA-11.7.0/bin/gmx
+Data prefix:  /apps/software/GROMACS/2023.1-foss-2022a-CUDA-11.7.0
+Working dir:  /home/reub0138/deflorian_A2A_v1/A2A_4g/vanilla_rep_3
+Command line:
+  gmx grompp -f minim.mdp -c system_solv_ions_water_removed.gro -p topol_water_removed.top -o em.tpr -r system_solv_ions_water_removed.gro -maxwarn 2
+
+Ignoring obsolete mdp entry 'title'
+Generating 1-4 interactions: fudge = 0.5
+Number of degrees of freedom in T-Coupling group rest is 109233.00
+The integrator does not provide a ensemble temperature, there is no system ensemble temperature
+
+Back Off! I just backed up em.tpr to ./#em.tpr.1#
+
+GROMACS reminds you: "Inventions have long since reached their limit, and I see no hope for further development." (Julius Sextus Frontinus, 1st century A.D.)
+
+Setting the LD random seed to -1210081409
+
+Generated 7503 of the 7503 non-bonded parameter combinations
+
+Generated 7503 of the 7503 1-4 parameter combinations
+
+Excluding 3 bonded neighbours molecule type 'Protein'
+
+Excluding 3 bonded neighbours molecule type 'unk'
+
+Excluding 3 bonded neighbours molecule type 'POPC'
+
+Excluding 2 bonded neighbours molecule type 'SOL'
+
+Excluding 1 bonded neighbours molecule type 'CL'
+Analysing residue names:
+There are:   305    Protein residues
+There are:   241      Other residues
+There are: 10410      Water residues
+There are:    11        Ion residues
+Analysing Protein...
+Analysing residues not classified as Protein/DNA/RNA/Water and splitting into groups...
+
+The largest distance between excluded atoms is 0.466 nm between atom 11401 and 11409
+Calculating fourier grid dimensions for X Y Z
+Using a fourier grid of 52x52x108, spacing 0.120 0.120 0.116
+
+Estimate for the relative computational load of the PME mesh part: 0.20
+
+This run will generate roughly 117 Mb of data
+                      :-) GROMACS - gmx mdrun, 2023.1 (-:
+
+Executable:   /apps/software/GROMACS/2023.1-foss-2022a-CUDA-11.7.0/bin/gmx
+Data prefix:  /apps/software/GROMACS/2023.1-foss-2022a-CUDA-11.7.0
+Working dir:  /home/reub0138/deflorian_A2A_v1/A2A_4g/vanilla_rep_3
+Command line:
+  gmx mdrun -v -deffnm em -ntmpi 1
+
+
+Back Off! I just backed up em.log to ./#em.log.1#
+Reading file em.tpr, VERSION 2023.1 (single precision)
+1 GPU selected for this run.
+Mapping of GPU IDs to the 1 GPU task in the 1 rank on this node:
+  PP:0
+PP tasks will do (non-perturbed) short-ranged interactions on the GPU
+PP task will update and constrain coordinates on the CPU
+Using 1 MPI thread
+
+Non-default thread affinity set, disabling internal thread affinity
+
+Using 8 OpenMP threads 
+
+
+Back Off! I just backed up em.trr to ./#em.trr.1#
+
+Back Off! I just backed up em.edr to ./#em.edr.1#
+
+Steepest Descents:
+   Tolerance (Fmax)   =  2.00000e+03
+   Number of steps    =       500000
+Step=    0, Dmax= 1.0e-02 nm, Epot=  5.41863e+18 Fmax=         inf, atom= 29070
+Step=    1, Dmax= 1.0e-02 nm, Epot=  5.41863e+18 Fmax=         inf, atom= 29070Step=    2, Dmax= 5.0e-03 nm, Epot=  5.41863e+18 Fmax=         inf, atom= 29070Step=    3, Dmax= 2.5e-03 nm, Epot=  5.41863e+18 Fmax=         inf, atom= 29070Step=    4, Dmax= 1.2e-03 nm, Epot=  5.41863e+18 Fmax=         inf, atom= 29070Step=    5, Dmax= 6.2e-04 nm, Epot=  5.41863e+18 Fmax=         inf, atom= 29070Step=    6, Dmax= 3.1e-04 nm, Epot=  5.41863e+18 Fmax=         inf, atom= 29070Step=    7, Dmax= 1.6e-04 nm, Epot=  5.41863e+18 Fmax=         inf, atom= 29070Step=    8, Dmax= 7.8e-05 nm, Epot=  5.41863e+18 Fmax=         inf, atom= 29070Step=    9, Dmax= 3.9e-05 nm, Epot=  5.41863e+18 Fmax=         inf, atom= 29070Step=   10, Dmax= 2.0e-05 nm, Epot=  5.41863e+18 Fmax=         inf, atom= 29070Step=   11, Dmax= 9.8e-06 nm, Epot=  5.41863e+18 Fmax=         inf, atom= 29070Step=   12, Dmax= 4.9e-06 nm, Epot=  5.41863e+18 Fmax=         inf, atom= 29070Step=   13, Dmax= 2.4e-06 nm, Epot=  5.41863e+18 Fmax=         inf, atom= 29070Step=   14, Dmax= 1.2e-06 nm, Epot=  5.41863e+18 Fmax=         inf, atom= 29070
+Energy minimization has stopped because the force on at least one atom is not
+finite. This usually means atoms are overlapping. Modify the input
+coordinates to remove atom overlap or use soft-core potentials with the free
+energy code to avoid infinite forces.
+You could also be lucky that switching to double precision is sufficient to
+obtain finite forces.
+
+writing lowest energy coordinates.
+
+Back Off! I just backed up em.gro to ./#em.gro.1#
+
+Steepest Descents converged to machine precision in 15 steps,
+but did not reach the requested Fmax < 2000.
+Potential Energy  =  5.4186324e+18
+Maximum force     =            inf on atom 29070
+Norm of force     =            inf
+
+GROMACS reminds you: "You got one part of that wrong. This is not meth." (Breaking Bad)
+
+PENNYWORTH LOG:  NVT
+                      :-) GROMACS - gmx grompp, 2023.1 (-:
+
+Executable:   /apps/software/GROMACS/2023.1-foss-2022a-CUDA-11.7.0/bin/gmx
+Data prefix:  /apps/software/GROMACS/2023.1-foss-2022a-CUDA-11.7.0
+Working dir:  /home/reub0138/deflorian_A2A_v1/A2A_4g/vanilla_rep_3
+Command line:
+  gmx grompp -f nvt.mdp -c em.gro -r em.gro -p topol_water_removed.top -n index.ndx -o nvt.tpr
+
+Ignoring obsolete mdp entry 'ns-type'
+Generating 1-4 interactions: fudge = 0.5
+Number of degrees of freedom in T-Coupling group Protein_unk_PA_PC_OL is 37714.00
+Number of degrees of freedom in T-Coupling group Water_and_ions is 62490.00
+
+NOTE 1 [file nvt.mdp]:
+  Removing center of mass motion in the presence of position restraints
+  might cause artifacts. When you are using position restraints to
+  equilibrate a macro-molecule, the artifacts are usually negligible.
+
+
+There was 1 NOTE
+
+Back Off! I just backed up nvt.tpr to ./#nvt.tpr.1#
+
+GROMACS reminds you: "What If None Of Your Dreams Come True ?" (E. Costello)
+
+Setting the LD random seed to -1375749123
+
+Generated 7503 of the 7503 non-bonded parameter combinations
+
+Generated 7503 of the 7503 1-4 parameter combinations
+
+Excluding 3 bonded neighbours molecule type 'Protein'
+
+turning H bonds into constraints...
+
+Excluding 3 bonded neighbours molecule type 'unk'
+
+turning H bonds into constraints...
+
+Excluding 3 bonded neighbours molecule type 'POPC'
+
+turning H bonds into constraints...
+
+Excluding 2 bonded neighbours molecule type 'SOL'
+
+turning H bonds into constraints...
+
+Excluding 1 bonded neighbours molecule type 'CL'
+
+turning H bonds into constraints...
+
+Setting gen_seed to -245370502
+
+Velocities were taken from a Maxwell distribution at 298.15 K
+
+The largest distance between excluded atoms is 0.466 nm between atom 11401 and 11409
+
+Determining Verlet buffer for a tolerance of 0.005 kJ/mol/ps at 298.15 K
+
+Calculated rlist for 1x1 atom pair-list as 1.222 nm, buffer size 0.022 nm
+
+Set rlist, assuming 4x4 atom pair-list, to 1.200 nm, buffer size 0.000 nm
+
+Note that mdrun will redetermine rlist based on the actual pair-list setup
+Calculating fourier grid dimensions for X Y Z
+Using a fourier grid of 52x52x108, spacing 0.120 0.120 0.116
+
+Estimate for the relative computational load of the PME mesh part: 0.22
+
+This run will generate roughly 4 Mb of data
+                      :-) GROMACS - gmx mdrun, 2023.1 (-:
+
+Executable:   /apps/software/GROMACS/2023.1-foss-2022a-CUDA-11.7.0/bin/gmx
+Data prefix:  /apps/software/GROMACS/2023.1-foss-2022a-CUDA-11.7.0
+Working dir:  /home/reub0138/deflorian_A2A_v1/A2A_4g/vanilla_rep_3
+Command line:
+  gmx mdrun -deffnm nvt -v -stepout 1000 -s nvt.tpr -cpi nvt.cpt -ntmpi 1
+
+
+Back Off! I just backed up nvt.log to ./#nvt.log.1#
+Reading file nvt.tpr, VERSION 2023.1 (single precision)
+Changing nstlist from 20 to 100, rlist from 1.2 to 1.2
+
+Update groups can not be used for this system because atoms that are (in)directly constrained together are interdispersed with other atoms
+
+1 GPU selected for this run.
+Mapping of GPU IDs to the 2 GPU tasks in the 1 rank on this node:
+  PP:0,PME:0
+PP tasks will do (non-perturbed) short-ranged interactions on the GPU
+PP task will update and constrain coordinates on the GPU
+PME tasks will do all aspects on the GPU
+Using 1 MPI thread
+
+Non-default thread affinity set, disabling internal thread affinity
+
+Using 8 OpenMP threads 
+
+
+Back Off! I just backed up nvt.xtc to ./#nvt.xtc.1#
+
+Back Off! I just backed up nvt.edr to ./#nvt.edr.1#
+starting mdrun 'Protein in water'
+5000 steps,     10.0 ps.
+/var/spool/slurm/slurmd/job48602/slurm_script: line 25: 590643 Segmentation fault      (core dumped) gmx mdrun -deffnm nvt -v -stepout 1000 -s nvt.tpr -cpi nvt.cpt -ntmpi 1
+PENNYWORTH LOG:  NPT_B
+                      :-) GROMACS - gmx grompp, 2023.1 (-:
+
+Executable:   /apps/software/GROMACS/2023.1-foss-2022a-CUDA-11.7.0/bin/gmx
+Data prefix:  /apps/software/GROMACS/2023.1-foss-2022a-CUDA-11.7.0
+Working dir:  /home/reub0138/deflorian_A2A_v1/A2A_4g/vanilla_rep_3
+Command line:
+  gmx grompp -f npt.mdp -c nvt.gro -r nvt.gro -t nvt.cpt -p topol_water_removed.top -n index.ndx -o npt.tpr
+
+
+-------------------------------------------------------
+Program:     gmx grompp, version 2023.1
+Source file: src/gromacs/commandline/cmdlineparser.cpp (line 271)
+Function:    void gmx::CommandLineParser::parse(int*, char**)
+
+Error in user input:
+Invalid command-line options
+  In command-line option -c
+    File 'nvt.gro' does not exist or is not accessible.
+    The file could not be opened.
+      Reason: No such file or directory
+      (call to fopen() returned error code 2)
+  In command-line option -r
+    File 'nvt.gro' does not exist or is not accessible.
+    The file could not be opened.
+      Reason: No such file or directory
+      (call to fopen() returned error code 2)
+  In command-line option -t
+    File 'nvt.cpt' does not exist or is not accessible.
+    The file could not be opened.
+      Reason: No such file or directory
+      (call to fopen() returned error code 2)
+
+For more information and tips for troubleshooting, please check the GROMACS
+website at http://www.gromacs.org/Documentation/Errors
+-------------------------------------------------------
+                      :-) GROMACS - gmx mdrun, 2023.1 (-:
+
+Executable:   /apps/software/GROMACS/2023.1-foss-2022a-CUDA-11.7.0/bin/gmx
+Data prefix:  /apps/software/GROMACS/2023.1-foss-2022a-CUDA-11.7.0
+Working dir:  /home/reub0138/deflorian_A2A_v1/A2A_4g/vanilla_rep_3
+Command line:
+  gmx mdrun -deffnm npt -v -stepout 1000 -s npt.tpr -cpi npt.cpt -ntmpi 1
+
+
+-------------------------------------------------------
+Program:     gmx mdrun, version 2023.1
+Source file: src/gromacs/commandline/cmdlineparser.cpp (line 271)
+Function:    void gmx::CommandLineParser::parse(int*, char**)
+
+Error in user input:
+Invalid command-line options
+  In command-line option -s
+    File 'npt.tpr' does not exist or is not accessible.
+    The file could not be opened.
+      Reason: No such file or directory
+      (call to fopen() returned error code 2)
+
+For more information and tips for troubleshooting, please check the GROMACS
+website at http://www.gromacs.org/Documentation/Errors
+-------------------------------------------------------
+PENNYWORTH LOG: PROD
+                      :-) GROMACS - gmx grompp, 2023.1 (-:
+
+Executable:   /apps/software/GROMACS/2023.1-foss-2022a-CUDA-11.7.0/bin/gmx
+Data prefix:  /apps/software/GROMACS/2023.1-foss-2022a-CUDA-11.7.0
+Working dir:  /home/reub0138/deflorian_A2A_v1/A2A_4g/vanilla_rep_3
+Command line:
+  gmx grompp -f prod.mdp -c npt.gro -r npt.gro -t npt.cpt -p topol_water_removed.top -n index.ndx -o prod.tpr
+
+
+-------------------------------------------------------
+Program:     gmx grompp, version 2023.1
+Source file: src/gromacs/commandline/cmdlineparser.cpp (line 271)
+Function:    void gmx::CommandLineParser::parse(int*, char**)
+
+Error in user input:
+Invalid command-line options
+  In command-line option -c
+    File 'npt.gro' does not exist or is not accessible.
+    The file could not be opened.
+      Reason: No such file or directory
+      (call to fopen() returned error code 2)
+  In command-line option -r
+    File 'npt.gro' does not exist or is not accessible.
+    The file could not be opened.
+      Reason: No such file or directory
+      (call to fopen() returned error code 2)
+  In command-line option -t
+    File 'npt.cpt' does not exist or is not accessible.
+    The file could not be opened.
+      Reason: No such file or directory
+      (call to fopen() returned error code 2)
+
+For more information and tips for troubleshooting, please check the GROMACS
+website at http://www.gromacs.org/Documentation/Errors
+-------------------------------------------------------
+                      :-) GROMACS - gmx mdrun, 2023.1 (-:
+
+Executable:   /apps/software/GROMACS/2023.1-foss-2022a-CUDA-11.7.0/bin/gmx
+Data prefix:  /apps/software/GROMACS/2023.1-foss-2022a-CUDA-11.7.0
+Working dir:  /home/reub0138/deflorian_A2A_v1/A2A_4g/vanilla_rep_3
+Command line:
+  gmx mdrun -deffnm prod -v -stepout 1000 -s prod.tpr -cpi prod.cpt -ntmpi 1
+
+
+-------------------------------------------------------
+Program:     gmx mdrun, version 2023.1
+Source file: src/gromacs/commandline/cmdlineparser.cpp (line 271)
+Function:    void gmx::CommandLineParser::parse(int*, char**)
+
+Error in user input:
+Invalid command-line options
+  In command-line option -s
+    File 'prod.tpr' does not exist or is not accessible.
+    The file could not be opened.
+      Reason: No such file or directory
+      (call to fopen() returned error code 2)
+
+For more information and tips for troubleshooting, please check the GROMACS
+website at http://www.gromacs.org/Documentation/Errors
+-------------------------------------------------------
