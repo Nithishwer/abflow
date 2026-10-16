@@ -1,0 +1,3 @@
+[submodule "src/MDRestraintsGenerator"]
+	path = src/MDRestraintsGenerator
+	url = https://github.com/Nithishwer/MDRestraintsGenerator.git

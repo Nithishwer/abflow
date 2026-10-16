@@ -9,8 +9,8 @@ Got it — here’s a clean README section with just your **install from source*
 1. **Clone the repository**
 
 ```bash
-git clone https://github.com/Nithishwer/abflow.git
-cd your-repo
+git clone --recurse-submodules https://github.com/Nithishwer/abflow.git
+cd abflow
 ```
 
 2. **Create and activate the conda environment**
@@ -23,16 +23,13 @@ conda activate abflow_v2
 3. **Install `MDRestraintsGenerator`**
 
 ```bash
-cd src
-git clone https://github.com/Nithishwer/MDRestraintsGenerator.git
-cd MDRestraintsGenerator
-pip install --no-deps .
+git submodule update --init --recursive
+pip install --no-deps ./src/MDRestraintsGenerator
 ```
 
 4. **Install this repository**
 
 ```bash
-cd ..
 pip install .
 ```
 
@@ -44,14 +41,11 @@ In addition to the Python environment (`abfe_environment.yml`), this workflow re
 module load GROMACS/2023
 ```
 
-MDRestraintsGenerator package needs to be installed with no-dependencies flag to avoid clashing with scipy module: 
+MDRestraintsGenerator is pinned by the Git submodule. Install it with `--no-deps` to retain the environment's SciPy version. For an editable installation, run this from the ABFlow repository root:
 
-```
-cd ~/Documents/abflow/src  # or wherever you keep your editable sources
-git clone https://github.com/Nithishwer/MDRestraintsGenerator.git
-cd MDRestraintsGenerator
-git checkout 03914398839e9cf912b6da2a4e04ce29b09b69c0
-pip install --no-deps -e .
+```bash
+git submodule update --init --recursive
+pip install --no-deps -e ./src/MDRestraintsGenerator
 ```
 
 ## Usage
