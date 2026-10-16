@@ -17,7 +17,7 @@ cd your-repo
 
 ```bash
 conda env create -f abfe_environment.yml
-conda activate abflow
+conda activate abflow_v2
 ```
 
 3. **Install `MDRestraintsGenerator`**

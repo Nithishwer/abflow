@@ -1,4 +1,4 @@
-name: abflow
+name: abflow_v2
 channels:
   - conda-forge
   - defaults
