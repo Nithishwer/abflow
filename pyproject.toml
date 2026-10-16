@@ -28,7 +28,7 @@ where = ["."]
 include = ["abfe*"]
 
 [tool.setuptools.package-data]
-"abfe" = ["console_assets/*.css", "console_assets/*.ttf", "console_assets/*LICENSE.txt"]
+"abfe" = ["analysis_protocol.json", "console_assets/*.css", "console_assets/*.ttf", "console_assets/*LICENSE.txt"]
 "abfe.utils" = ["water_deletor.pl"]
 
 # Include all .sh files in all subfolders of job_script_template

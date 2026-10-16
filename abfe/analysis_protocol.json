@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "minimum_ps": 16000,
+  "increment_ps": 5000,
+  "maximum_ps": 50000,
+  "half_difference_kcal_mol": 0.5,
+  "discard_ps": 10,
+  "uncorr": "dhdl",
+  "threshold": 50,
+  "methods": ["MBAR", "BAR", "TI"],
+  "n_bootstraps": 50,
+  "fractions": 10,
+  "seed": 20261016,
+  "phase_order": ["rest", "coul", "vdw"]
+}

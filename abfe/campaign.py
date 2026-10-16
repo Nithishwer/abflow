@@ -200,6 +200,12 @@ def read_registry(registry):
                          "observed_at": row["observed_at"], "incidents": [dict(item) for item in
                          db.execute("SELECT * FROM incidents WHERE run_id=? ORDER BY code", (row["id"],))],
                          "history": [dict(item) for item in db.execute("SELECT revision,observed_at FROM history WHERE run_id=? ORDER BY revision", (row["id"],))]})
+        for row in rows:
+            assignment = metadata.get('embedding_labels', {}).get(row['spec']['id'])
+            if assignment:
+                row['embedding_assignment'] = assignment
+        from .analysis import attach
+        attach(db, rows)
     return metadata, rows
 
 
@@ -359,7 +365,7 @@ def presentation(row, metadata):
     stage = {"not_prepared": "not_started", "inputs_present": "inputs", "directory_present": "prepared",
              "windows_present": "prepared", "setup_present": "prepared", "production_observed": "production",
              "analysis_files_only": "analysis", "equilibrating": "equilibration"}.get(observed.get("stage"), "unknown")
-    if analysis.get("state") in ("legacy_unverified", "possibly_stale", "invalid", "validated"):
+    if analysis.get("state") in ("legacy_unverified", "possibly_stale", "invalid", "validated", "stale", "failed", "planned", "historical_imported"):
         stage = "analysis"
     if verified_analysis and not vanilla:
         stage = "converged"
@@ -368,7 +374,7 @@ def presentation(row, metadata):
         locations = ["absolut"]
     elif matches and all(item["state"] in ("PENDING", "CONFIGURING", "REQUEUED") for item in matches):
         stage = "queued"
-    if row["incidents"] or observed.get("issues") or observed.get("stage") == "observation_error" or completion_conflict:
+    if analysis.get("state") in ("failed", "stale") or analysis.get("decision", {}).get("action") == "stop_at_limit" or row["incidents"] or observed.get("issues") or observed.get("stage") == "observation_error" or completion_conflict:
         remarks = "Attention required"
     elif complete or any(item["state"] in ("RUNNING", "COMPLETING") for item in matches):
         remarks = "OK"
@@ -376,9 +382,15 @@ def presentation(row, metadata):
         remarks = "Waiting"
     else:
         remarks = "Unknown"
+    convergence = 'unverified'
+    if analysis.get('state') == 'validated':
+        convergence = analysis.get('convergence', 'unverified')
+    elif analysis.get('state') == 'historical_imported':
+        convergence = {'historically_converged': 'converged (historical)',
+                       'historically_unconverged': 'unconverged (historical)'}.get(analysis.get('convergence'), 'unverified')
     return {"simulation_type": "Vanilla" if vanilla else "Alchemical", "leg": "Solvent" if spec["leg"] == "solvent" else "Complex",
             "repeat": 1 if spec["leg"] == "solvent" else spec["repeat"], "stage": stage, "stage_label": STAGES[stage][0],
-            "convergence": "N/A" if vanilla else (analysis.get("convergence", "unverified") if analysis.get("state") == "validated" else "unverified"),
+            "convergence": "N/A" if vanilla else convergence,
             "job_id": ", ".join(dict.fromkeys(job_ids)) or "Unknown", "location": ", ".join(locations) or "Unknown",
             "remarks": remarks, "jobs": matches}
 
@@ -585,6 +597,13 @@ def scan(registry, progress=None):
                            "analysis": {"state": "unknown", "analysed_ns": None, "convergence": "unverified"},
                            "evidence": [], "issues": [], "next_action": "Inspect observation error"}
             issue(observation, "observation_error", str(exc))
+        if row.get("analysis_record", {}).get("state") == "validated" and (row.get("observation") or {}).get("analysis", {}).get("state") == "validated":
+            # Old CSVs remain evidence, but a current managed analysis supersedes their missing provenance.
+            observation["issues"] = [item for item in observation["issues"]
+                                     if item["code"] not in ("analysis_provenance", "newer_source_files", "invalid_analysis")]
+        for detected in row["incidents"]:
+            if detected.get("detected_in_report"):
+                issue(observation, detected["code"], detected["message"])
         previous = row["observation"] or {}
         if previous.get("stage") not in (None, "not_prepared", "inputs_present", "observation_error") and spec["path"] and not Path(spec["path"]).exists():
             issue(observation, "source_disappeared", "A previously observed run directory is now missing or inaccessible; do not infer that work was reset.")
@@ -712,7 +731,7 @@ def overview_html(metadata, rows):
         datasets.append(f'<article class="dataset-card" style="--dataset-color:{DATASET_COLORS.get(item["id"], "#0fffdb")}">'
                         f'<div class="topline"><h2>{escape(item["label"])}</h2>{jump(item["id"])}</div>'
                         f'<p class="subtle">{item["compounds"]} compounds · {item["runs"]} run records</p>{legs}'
-                        f'<p class="summary-counts"><span>{item["converged"]} alchemical legs converged</span><span>{item["complete"]} runs complete</span>'
+                        f'<p class="summary-counts"><span>{item["converged"]} alchemical legs with validated convergence</span><span>{item["complete"]} runs complete</span>'
                         f'<span class="attention">{item["attention"]} runs need attention</span></p>'
                         f'<p class="subtle">{item["legacy"]} legacy analyses unverified</p></article>')
     compounds = []
@@ -744,7 +763,7 @@ def report_html(metadata, rows):
         dependencies = ''.join(f"<li>{escape(item)}</li>" for item in spec["dependencies"])
         jobs = ''.join(f"<li>{escape(item['cluster'])} · {escape(item['job_id'])} · {escape(item['state'])}</li>" for item in view["jobs"])
         detail = (f"<h3>{escape(spec['id'])}</h3><p>Source: {escape(spec['path'] or 'not prepared')}<br>"
-                  f"Embedding: {escape(spec['embedding'] or ('not applicable' if spec['leg'] == 'solvent' else 'unrecorded'))}<br>"
+                  f"Embedding: {escape((row['embedding_assignment']['label'] + ' (run name)') if row.get('embedding_assignment') else (spec['embedding'] or ('not applicable' if spec['leg'] == 'solvent' else 'unrecorded')))}<br>"
                   f"Observed windows: {escape(observed.get('sampled_windows', 0))}/{escape(observed.get('expected_windows', 0))}<br>"
                   f"Observed maximum: {escape(number(observed.get('production_max_ns')))} ns<br>"
                   f"Transfer evidence: {escape(observed.get('transfer', {}).get('state', 'unknown'))}<br>"
@@ -754,6 +773,20 @@ def report_html(metadata, rows):
                   f"<h4>Dependencies</h4><ul>{dependencies or '<li>None</li>'}</ul>"
                   f"<details><summary>File evidence ({len(observed.get('evidence', []))})</summary><ul>{evidence_links}</ul></details>"
                   f"<details><summary>Observation history ({len(row['history'])})</summary><ol>{history}</ol></details>")
+        if row.get("analysis_record"):
+            detail += ("<h4>Analysis and decision</h4><pre>" +
+                       escape(json.dumps(analysis, indent=2, allow_nan=False)) + "</pre>")
+        if row.get("historical_analysis"):
+            imported = row["historical_analysis"]
+            links = ''.join(f'<li><a href="{escape(Path(item["identity"]["path"]).as_uri())}">{escape(item["identity"]["path"])}</a></li>' for item in imported["files"])
+            detail += (f"<h4>Historical analysis imported</h4><p>Record: {escape(imported['id'])}<br>"
+                       f"Analysed cutoff: {escape(number(imported.get('analysed_ns')))} ns · uncertainties: legacy as reported<br>"
+                       f"Cutoff basis: {escape(imported.get('duration_assignment', {}).get('rule', 'unknown'))}<br>"
+                       f"Convergence: {escape(imported.get('convergence', 'unverified').replace('_', ' '))}</p>"
+                       + '<pre>' + escape(json.dumps(imported.get('convergence_assessment', {}), indent=2)) + f'</pre><ul>{links}</ul>')
+        if row.get("binding_result"):
+            detail += ("<h4>Binding result and shared solvent</h4><pre>" +
+                       escape(json.dumps(row["binding_result"], indent=2, allow_nan=False)) + "</pre>")
         dataset_color = DATASET_COLORS.get(spec["dataset"], "#0fffdb")
         stage_color = STAGES[view["stage"]][1]
         remark_color = REMARK_COLORS[view["remarks"]]
@@ -764,7 +797,7 @@ def report_html(metadata, rows):
                  f'<td class="edge stage" style="--edge-color:{stage_color}">{escape(view["stage_label"])}</td>',
                  f'<td class="numeric">{escape(number(observed.get("production_ns")))}</td>',
                  f'<td class="numeric subtle">{escape(number(analysis.get("analysed_ns")))}</td>',
-                 f'<td class="subtle">{escape(analysis.get("state", "unknown").replace("_", " "))}</td>',
+                 f'<td class="subtle">{escape(("Historical analysis imported" if analysis.get("state") == "historical_imported" else analysis.get("state", "unknown").replace("_", " ")))}</td>',
                  f'<td class="subtle">{escape(view["convergence"])}</td>',
                  f'<td class="job" title="{escape(view["job_id"])}">{escape(view["job_id"])}</td>',
                  f'<td class="location">{escape(view["location"])}</td>',
@@ -882,6 +915,18 @@ def main(argv=None):
     init.add_argument("--source-root", type=Path)
     sub.add_parser("scan", help="Read local source files and persist observations/incidents")
     sub.add_parser("check-connections", help="Check SSH, own-job queues and Slurm capacity on the three clusters")
+    analysis = sub.add_parser("analyse", help="Validate and analyse one stable local alchemical leg in place")
+    analysis.add_argument("run_id")
+    analysis.add_argument("--cutoff-ns", required=True, type=float)
+    analysis.add_argument("--plan", action="store_true", help="Validate inputs and record a plan without running estimators")
+    historical = sub.add_parser("import-analysis", help="Import historical result CSVs with their original provenance")
+    historical.add_argument("run_id")
+    historical.add_argument("--plan", action="store_true", help="Preview historical records without writing")
+    decision = sub.add_parser("decide", help="Rehash analysis evidence and show the permitted decision; no execution")
+    decision.add_argument("run_id")
+    bind = sub.add_parser("bind", help="Compile one binding result using an explicitly reviewed shared solvent")
+    bind.add_argument("run_id")
+    bind.add_argument("--compatibility", required=True, type=Path)
     sampling = sub.add_parser("sample-clusters", help="Record one five-minute cluster snapshot and atomically refresh local reports")
     sampling.add_argument("--publish-dir", required=True, type=Path)
     view = sub.add_parser("status", help="Show the overview table or JSON")
@@ -896,6 +941,19 @@ def main(argv=None):
     try:
         if args.command == "init":
             print(f"Registered {initialize(args.registry, args.manifest, args.source_root)} runs; no source files changed.")
+        elif args.command == "import-analysis":
+            from .analysis import import_analysis
+            print(json.dumps(import_analysis(args.registry, args.run_id, args.plan), indent=2, allow_nan=False))
+        elif args.command == "bind":
+            from .analysis import binding
+            print(json.dumps(binding(args.registry, args.run_id, args.compatibility), indent=2, allow_nan=False))
+        elif args.command in ("analyse", "decide"):
+            from .analysis import analyse, current_decision
+            result = (analyse(args.registry, args.run_id, args.cutoff_ns, args.plan) if args.command == "analyse"
+                      else current_decision(args.registry, args.run_id))
+            print(json.dumps(result, indent=2, allow_nan=False))
+            if result.get("action") == "blocked":
+                parser.exit(1, "Analysis/decision blocked; inspect the reason above.\n")
         elif args.command == "scan":
             count = scan(args.registry, lambda done, total: print(f"Observing local files: {done}/{total} runs", file=sys.stderr, flush=True))
             print(f"Observed {count} runs; no source files changed.")

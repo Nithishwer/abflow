@@ -222,6 +222,25 @@ class CampaignTests(unittest.TestCase):
         self.assertNotIn("incomplete_production_data", [item["code"] for item in row["observation"]["issues"]])
         self.assertTrue(all(item["status"] == "open" for item in row["incidents"]))
 
+    def test_manual_embedding_label_is_displayed_without_becoming_a_source_path(self):
+        self.production()
+        self.initialize()
+        run_id='test/L1/complex/1'
+        spec_before=self.complex_row()['spec']
+        assignment=dict(label='van1',basis='user_assigned_from_run_directory_name',source=str(Path(spec_before['path']).parent))
+        with sqlite3.connect(self.registry) as db:
+            db.execute('insert into metadata values(?,?)',('embedding_labels',json.dumps({run_id:assignment})))
+        campaign.scan(self.registry)
+        metadata,rows=campaign.read_registry(self.registry)
+        row=next(r for r in rows if r['spec']['id']==run_id)
+        self.assertEqual(row['embedding_assignment']['label'],'van1')
+        self.assertEqual(row['spec'],spec_before)
+        self.assertIsNone(row['observation']['embedding']['path'])
+        codes=[i['code'] for i in row['incidents']]
+        self.assertNotIn('missing_embedding',codes)
+        self.assertIn('embedding_provenance',codes)
+        self.assertIn('Embedding: van1 (run name)',campaign.report_html(metadata,rows))
+
     def test_repeated_embedding_sources_are_incidents(self):
         (self.source / "embedding").mkdir()
         self.config["datasets"][0]["ligands"] = [{"id": "L1", "embeddings": {"1": "embedding", "2": "embedding", "3": "embedding"}}]

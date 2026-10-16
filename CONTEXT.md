@@ -46,7 +46,7 @@ the same stable mapping. Stage cells have a separate colored edge and text label
   Durations/repeats sort numerically, text/IDs naturally, and unknown/N/A values stay last
   in both directions. Filtering and Inspect details remain attached to their rows.
   Details is an action column and has no sort control.
-- Vanilla convergence is **N/A**; legacy alchemical convergence stays unverified.
+- Vanilla convergence is **N/A**; approved imported classifications display explicit historical labels; other legacy convergence stays unverified.
 - **Job ID** and **Location** require fresh observed work-directory matches, not
   job-name guesses or intended routing. The workstation is **absolut**, shown only
   for validated completion with verified local retrieval. Unknown stays Unknown.
@@ -141,3 +141,106 @@ running this deterministic command against the existing workspace registry. Rout
 successful samples stay quiet. Collection requires the desktop/local host and SSH access
 to remain available; missed times are not backfilled. No submission/cancellation,
 scientific actions or automatic production repairs are authorized by this monitor.
+
+## Local analysis layer
+
+### Revised batch-analysis plan
+
+The user removed the separate readiness-check and cutoff-selection step from the
+batch-analysis plan on 16 October 2026. The revised flow is:
+
+1. Select runs needing analysis from the registry.
+2. Run analysis on their available local DHDLs and save results and provenance.
+3. Record convergence and the next decision.
+
+The 16 ns convergence minimum, 10 ps discard, strict absolute half-difference
+<0.5 kcal/mol, +5 ns extension rule and 50 ns cap remain the scientific policy.
+The existing per-run CLI still has preflight checks and requires an explicit cutoff;
+this documentation change does not change that implementation.
+
+### Current implementation
+
+Milestone 2 adds `abfe/analysis.py`, packaged `analysis_protocol.json`, and
+`analyse --plan`, `analyse`, `decide`, and `bind` CLI operations. Analysis runs on
+absolut using `/biggin/b211/reub0138/miniforge3/envs/abflow_v2/bin/python`, reading
+local DHDL files in place. It writes only its own unique output directories
+and additive immutable analysis records. No simulation execution or input editing
+is enabled. The extension policy is analysed cutoff **+5 ns**, capped at 50 ns for
+both legs, with the 16 ns minimum and 10 ps discard retained. README documents
+validation, freshness, incidents, exact dependency versions and solvent review.
+
+The environment's scientific imports and numerical MBAR/BAR/TI/convergence checks
+pass. Conda records alchemlyb 2.4.1, while its installed distribution reports
+`0.0.0`; analysis provenance therefore also records scientific module source hashes.
+The older `abfe` environment fails JAX import against its SciPy version and was not
+modified. Scientific validation does not establish preparation/protocol adoption
+or resolve existing incidents.
+
+### Solvent compatibility review format
+
+The review JSON uses `schema_version: 1`, `reviewed_by`, `complex_analysis_id` and
+`solvent_analysis_id`. Its `complex` and `solvent` objects must match on
+`ligand_chemical_state`, `ligand_parameters`, `force_fields`, `solvent_conditions`,
+`temperature_K` and `charge_treatment`. The `evidence` list contains supporting file
+`path` and `sha256` values. The review identifies the exact analyses being combined.
+
+### Historical result import
+
+`import-analysis RUN_ID --plan` previews the run's existing result CSVs; omit
+`--plan` to append an immutable historical record. Imports retain source paths,
+hashes, original values/uncertainties and linked solvent origins, with an unknown
+cutoff and unverified scientific status. They are separate from validated analysis
+records. Identical imports reuse the record; invalid imports create an incident.
+
+
+On 16 October 2026 the user authorized assigning historical analysed duration when
+the analysis CSV and present DHDL modification dates match (Europe/London calendar
+dates). The one-time campaign migration appended 72 historical amendments: 48
+Deflorian and 24 Piersanti, with 71 at 20 ns and one at 19.949 ns. The remaining
+31 cutoffs stay unknown. Evidence comes from copied analysis inputs, or complete
+original production windows when copies are absent. Original imports are retained;
+convergence stays unverified. Console/Inspect now display the assigned duration and
+rule. The migration audit and backup are in the workspace under
+`.abflow/imports/date-rule-20261016/`. Validation: 89 focused tests ran successfully,
+with one opt-in scientific integration test skipped; date-rule checks also passed.
+
+
+The user then explicitly authorized historical convergence classification for those
+72 date-approved results: analysed duration >=16 ns and absolute MBAR half-difference
+strictly <0.5 kcal/mol. Appended immutable assessments classify 51 as historically
+converged (31 Deflorian, 20 Piersanti) and 21 as historically unconverged (17 and 4).
+Runs and Inspect display historical labels and the recorded assessment; the other
+31 imported cutoffs remain unknown/unverified. These labels do not establish managed
+validation, change decision/binding gates or resolve incidents. SQL backup and audit:
+workspace `.abflow/imports/historical-convergence-20261016/`. All 90 focused tests
+ran successfully (one scientific integration test skipped); rule boundary checks passed.
+
+
+Analysis incident gate correction: `embedding_provenance` no longer blocks computing
+analysis from existing DHDLs. It stays open in the console and is included in each
+new analysis record's `open_incidents`. Other open incidents still block analysis;
+`decide` and binding retain their incident gates. This fixes the reported block for
+Deflorian OX2_43703 complex repeat 2 without resolving preparation provenance or
+changing scientific settings. The batch plan still has no separate readiness step;
+existing per-run input checks and the explicit cutoff argument remain implemented.
+
+Validation: 91 focused tests ran successfully (one scientific integration test skipped).
+The real OX2_43703 repeat-2 `analyse --cutoff-ns 20 --plan` now passes all 44 windows
+and returns `decision.action=analyse`; embedding provenance remains open. No estimator
+ran. The workspace retains the plan receipt and verification under
+`.abflow/milestone2-validation/43703-repeat2-analysis-plan*.json`.
+
+
+### Manual embedding labels
+
+At the user's request, 99 existing complex run folders now have `van1`/`van2`/`van3`
+labels extracted from `abfe_vanN_hrex_rM`: 81 Deflorian and 18 Piersanti, 33 of each
+label. SQLite metadata `embedding_labels` maps run IDs to the label, source directory,
+assignment time, user-directed basis and unverified independence. `read_registry`
+exposes `embedding_assignment`; Inspect displays `vanN (run name)`. Metadata overlays
+retain labels across scans without changing scientific run specs or invalidating an
+active analysis. The manifest's original embedding source-path mapping remains
+separate; source provenance and incidents remain open for later audit. Preserve these
+labels in milestone 3. The workspace audit/backup is under
+`.abflow/imports/manual-embedding-labels-20261016/`. All 92 focused tests ran
+successfully (one scientific integration check skipped); both reports were refreshed.
