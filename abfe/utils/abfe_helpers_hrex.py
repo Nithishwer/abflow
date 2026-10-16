@@ -53,7 +53,9 @@ def generate_boresch_restraints(
     abfe_path: Path,
     resname: str = "unk",
     input_gro: str = "npt.gro",
-    gmx_exec: str = "gmx"
+    gmx_exec: str = "gmx",
+    restraint_script=None,
+    topology_path=None
 ):
     vanilla = Path(vanilla_folder_name).resolve()
     boresch = abfe_path / "boresch"
@@ -64,22 +66,18 @@ def generate_boresch_restraints(
 
     # 1) build the tpr
     logging.info("Creating GROMACS tpr file…")
-    subprocess.run(
-        f"{gmx_exec} grompp "
-        f"-f {vanilla/'prod.mdp'} "
-        f"-c {vanilla/input_gro} "
-        f"-r {vanilla/input_gro} "
-        f"-p {vanilla/'topol_water_removed.top'} "
-        f"-n {vanilla/'index.ndx'} "
-        f"-o prod.tpr",
-        shell=True, check=True
-    )
+    subprocess.run([
+        gmx_exec, "grompp", "-f", str(vanilla / "prod.mdp"),
+        "-c", str(vanilla / input_gro), "-r", str(vanilla / input_gro),
+        "-p", str(topology_path or vanilla / "topol_water_removed.top"),
+        "-n", str(vanilla / "index.ndx"), "-o", "prod.tpr"
+    ], check=True)
 
     # 2) locate BoreschRestraintGMX.py in the cloned repo
     #    go up two levels from the module's __file__ to get the project root
     module_path = Path(MDRestraintsGenerator.__file__)
     project_root = module_path.parents[1]
-    script_path = project_root / "scripts" / "BoreschRestraintGMX.py"
+    script_path = Path(restraint_script) if restraint_script else project_root / "scripts" / "BoreschRestraintGMX.py"
     if not script_path.exists():
         raise FileNotFoundError(f"Cannot find BoreschRestraintGMX.py at {script_path!s}")
 
@@ -129,19 +127,19 @@ def add_boresch_to_topol(source_file, destination_file):
             sys.exit(1)
 
 
-def copy_complex(vanilla_folder_name: str, abfe_path: Path, copy_ff: bool = True):
+def copy_complex(vanilla_folder_name: str, abfe_path: Path, copy_ff: bool = True, forcefield_path=None, topology_path=None):
     vanilla_folder = Path(vanilla_folder_name).resolve()
     complex_dir = abfe_path / "complex"
     complex_dir.mkdir(parents=True, exist_ok=True)
 
     shutil.copy(abfe_path / 'boresch' / 'ClosestRestraintFrame.gro', complex_dir / 'complex.gro')
     shutil.copy(abfe_path / 'boresch' / 'BoreschRestraint.top', complex_dir / 'BoreschRestraint.top')
-    shutil.copy(vanilla_folder / 'topol_water_removed.top', complex_dir / 'complex.top')
+    shutil.copy(topology_path or vanilla_folder / 'topol_water_removed.top', complex_dir / 'complex.top')
     shutil.copytree(vanilla_folder / 'toppar', complex_dir / 'toppar', dirs_exist_ok=True)
 
     if copy_ff:
-        ff_src = pkg_resources.files(forcefield_dir) / 'amber99sb-star-ildn-mut.ff'
-        ff_dst = complex_dir / 'amber99sb-star-ildn-mut.ff'
+        ff_src = Path(forcefield_path) if forcefield_path else pkg_resources.files(forcefield_dir) / 'amber99sb-star-ildn-mut.ff'
+        ff_dst = complex_dir / ff_src.name
         shutil.copytree(ff_src, ff_dst, dirs_exist_ok=True)
 
     add_boresch_to_topol(complex_dir / 'BoreschRestraint.top', complex_dir / 'complex.top')
@@ -152,7 +150,7 @@ def copy_complex(vanilla_folder_name: str, abfe_path: Path, copy_ff: bool = True
 def calculate_total_charge(sdf_file):
     """Calculate the total formal charge of a molecule from an SDF file."""
     # Load the molecule from the SDF file
-    supplier = Chem.SDMolSupplier(sdf_file)
+    supplier = Chem.SDMolSupplier(str(sdf_file))
     
     # Check if there is a molecule in the SDF file
     if not supplier or len(supplier) == 0:
@@ -166,7 +164,7 @@ def calculate_total_charge(sdf_file):
     
     return total_charge
 
-def create_fep_system(lig_name: str, vanilla_folder: Path, force=False):        ## REFACTORED
+def create_fep_system(lig_name: str, vanilla_folder: Path, force=False, expected_charge=None):        ## REFACTORED
     """Create a Free Energy Perturbation (FEP) system for a given ligand."""
     try:
         # Calculate the ligand charge
@@ -174,6 +172,10 @@ def create_fep_system(lig_name: str, vanilla_folder: Path, force=False):        
         lig_sdf = vanilla_folder / 'smirnoff' / f"{lig_suffix}.sdf"
 
         lig_ch = calculate_total_charge(lig_sdf)
+        if expected_charge is not None:
+            if lig_ch != expected_charge:
+                raise ValueError(f"Unexpected ligand charge: {lig_ch}; expected {expected_charge}")
+            force = True
         if lig_ch != 0:
             logging.warning(f"Ligand {lig_name} has a non-zero charge of {lig_ch} e.")
             if not force:
@@ -190,7 +192,7 @@ def create_fep_system(lig_name: str, vanilla_folder: Path, force=False):        
         script_path = Path(__file__).parent / "add_alchemical_ion_v3_pertuball.py"
         
         command = [
-            'python',
+            sys.executable,
             str(script_path),
             '--lig_charge', str(lig_ch),
             '--alch_ion_method', alch_mthd,

@@ -1,6 +1,7 @@
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from rdkit import Chem
 import logging
@@ -15,7 +16,15 @@ from abfe.utils.data.ligand_only import lig_super_mdp_files_pertuball
 
 
 class LigandOnlySetup:
-    def __init__(self, ligand_name: str, abfe_dir: Path):
+    def __init__(self, ligand_name: str, abfe_dir: Path, *, vanilla_path=None, forcefield_path=None,
+                 topology_template=None, solvent_box="spc216.gro", salt_molar=0.15,
+                 expected_charge=None, write_job_scripts=True):
+        self.vanilla_path = Path(vanilla_path) if vanilla_path else Path(abfe_dir).parent / "vanilla_rep_1"
+        self.forcefield_path = Path(forcefield_path) if forcefield_path else None
+        self.solvent_box = solvent_box
+        self.salt_molar = salt_molar
+        self.expected_charge = expected_charge
+        self.write_job_scripts = write_job_scripts
         self.ligand_name = ligand_name
         self.abfe_dir = abfe_dir
         self.lig_dir = abfe_dir / "ligand"
@@ -29,7 +38,7 @@ class LigandOnlySetup:
         self.script_dir = files("abfe.utils.data.ligand_only")
 
         # Derived paths to individual files
-        self.topol_template = self.script_dir / "lig_topol_ref.top"
+        self.topol_template = Path(topology_template) if topology_template else self.script_dir / "lig_topol_ref.top"
         self.em_mdp = self.script_dir / "ligand_em.mdp"
         self.submit_script = self.script_dir / "lig_submit.sh"
         self.sim_list = self.script_dir / "lig_simulations_list.txt"
@@ -43,39 +52,41 @@ class LigandOnlySetup:
         self._cleanup()
         self._make_index()
         self._write_mdps()
-        self._generate_submission_script()
+        if self.write_job_scripts:
+            self._generate_submission_script()
 
     def _make_dirs(self):
-        self.lig_dir.mkdir(exist_ok=True)
+        self.lig_dir.mkdir(parents=True)
         self.toppar_dir.mkdir(exist_ok=True)
         os.chdir(self.lig_dir)
 
     def _copy_files(self):
 
         lig_suffix = self.ligand_name.split("_")[-1]
-        base = self.abfe_dir.parent / "vanilla_rep_1"
+        base = self.vanilla_path
 
         file_map = {
             base / "smirnoff" / f"{lig_suffix}_mod.gro": self.lig_dir / f"{self.ligand_name}_mod.gro",
             base / "toppar" / f"{lig_suffix}.itp": self.toppar_dir / f"{lig_suffix}.itp",
             base / "toppar" / f"{lig_suffix}_posre.itp": self.toppar_dir / f"{lig_suffix}_posre.itp",
             base / "toppar" / f"{lig_suffix}_atomtypes.itp": self.toppar_dir / f"{lig_suffix}_atomtypes.itp",
-            self.script_dir / "lig_topol_ref.top": self.lig_dir / "lig.top",
+            self.topol_template: self.lig_dir / "lig.top",
             self.script_dir / "ligand_em.mdp": self.lig_dir / "em.mdp",
             self.script_dir / "lig_submit.sh": self.lig_dir / "submit.sh",
             self.script_dir / "lig_simulations_list.txt": self.lig_dir / "simulations_list.txt",
         }
 
+        if not self.write_job_scripts:
+            file_map.pop(self.script_dir / "lig_submit.sh")
         for src, dst in file_map.items():
             if not src.exists():
                 raise FileNotFoundError(f"Required file not found: {src}")
             shutil.copyfile(src, dst)
 
-        # ✅ Copy forcefield
-        with as_file(files(forcefield_dir) / "amber99sb-star-ildn-mut.ff") as ff_src_real:
-            ff_dst = self.lig_dir / "amber99sb-star-ildn-mut.ff"
-            shutil.copytree(ff_src_real, ff_dst, dirs_exist_ok=True)
-            logging.info(f"Copied forcefield directory from {ff_src_real} to {ff_dst}")
+        if self.forcefield_path is None:
+            raise ValueError("Supply a reviewed forcefield_path; the legacy bundled force field conflicts with lig.top")
+        ff_src = self.forcefield_path
+        shutil.copytree(ff_src, self.lig_dir / ff_src.name)
 
         # ✅ Copy MDP templates (FIXED)
         mdp_dst_dir = self.lig_dir / "super_mdp_files"
@@ -130,7 +141,7 @@ class LigandOnlySetup:
         subprocess.run([
             "gmx", "solvate",
             "-cp", "ligand_only.gro",
-            "-cs", "spc216.gro",
+            "-cs", str(self.solvent_box),
             "-o", "system_solv.gro",
             "-p", "lig.top"
         ], check=True)
@@ -146,8 +157,9 @@ class LigandOnlySetup:
         ], check=True)
 
         subprocess.run(
-            "echo SOL | gmx genion -s ions.tpr -o lig.gro -p lig.top -pname NA -nname CL -neutral -conc 0.15",
-            shell=True, check=True
+            ["gmx", "genion", "-s", "ions.tpr", "-o", "lig.gro", "-p", "lig.top",
+             "-pname", "NA", "-nname", "CL", "-neutral", "-conc", str(self.salt_molar)],
+            input="SOL\n", text=True, check=True
         )
 
     def _calculate_total_charge(self, sdf_path):
@@ -168,10 +180,14 @@ class LigandOnlySetup:
 
     def _create_fep_system(self, force=False):
         lig_suffix = self.ligand_name.split("_")[-1]
-        sdf_path = self.abfe_dir.parent / "vanilla_rep_1" / "smirnoff" / f"{lig_suffix}.sdf"
+        sdf_path = self.vanilla_path / "smirnoff" / f"{lig_suffix}.sdf"
 
 
         lig_charge = self._calculate_total_charge(sdf_path)
+        if self.expected_charge is not None:
+            if lig_charge != self.expected_charge:
+                raise ValueError(f"Unexpected ligand charge: {lig_charge}; expected {self.expected_charge}")
+            force = True
         if lig_charge != 0:
             logging.warning(f"Ligand {self.ligand_name} has a non-zero charge of {lig_charge} e.")
             if not force:
@@ -184,7 +200,7 @@ class LigandOnlySetup:
         script_path = self.lig_dir / "add_alchemical_ion_v3_pertuball.py"
 
         command = [
-            "python", str(script_path),
+            sys.executable, str(script_path),
             "--lig_charge", str(lig_charge),
             "--alch_ion_method", alch_method,
             "--lig", "unk",
@@ -213,7 +229,6 @@ class LigandOnlySetup:
         """Create FEP simulation directories and write templated MDP files using soluble system templates."""
         leg_windows = {
             "coul": 11,
-            "rest": 12,
             "vdw": 21
         }
         stages = ["enmin", "npt_b", "npt_pr", "nvt", "prod"]
@@ -241,7 +256,7 @@ class LigandOnlySetup:
 
                         # Replace template placeholders
                         modified_content = (
-                            content.replace("<state>", str(i))
+                            content.replace("<state>", str(i if leg == "coul" else 11 + i))
                                 .replace("Protein_LIG_POPC", pml_index)
                                 .replace("Water_and_ions_B_CL", wiai_index)
                         )
@@ -251,7 +266,7 @@ class LigandOnlySetup:
 
                         logging.info(f"Written: {output_path}")
                     except FileNotFoundError:
-                        logging.error(f"Missing MDP template: {template_filename}")
+                        raise FileNotFoundError(f"Missing MDP template: {template_filename}")
 
 
     def _generate_submission_script(self):

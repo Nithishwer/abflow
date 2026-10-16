@@ -97,56 +97,20 @@ setup.setup_all()
 
 ## ABFE Setup
 
-The `ABFESetup` class automates the creation of simulation-ready folders for Absolute Binding Free Energy (ABFE) calculations, one per replicate. The workflow supports both **complex-leg** (protein-ligand) and **ligand-only** simulations.
+Use `abflow_v2` and fill in `examples/preparation.json` with one registered compound's
+three equilibration repeats, a CHARMM-GUI membrane input directory, reviewed
+parameters and explicit water/ion settings.
 
-> **Only edit the two lines under "Define base path and ligand names"** — the rest will work as-is.
-
-### Example: Full ABFE Setup Workflow
-
-```python
-from abfe.setup_abfe_simulations import ABFESetup
-from abfe.utils.ligand_only_setup import LigandOnlySetup
-from pathlib import Path
-import logging
-
-# --- 🔧 Define base path and ligand names (EDIT THIS ONLY) ---
-base_path = "/ABS/PATH/TO/WORKDIR"
-ligands = ["Ligand1", "Ligand2"]  # Each should be a subfolder under base_path
-
-# --- Optional settings ---
-num_replicates = 3
-archer_nodes = 22  # Adjust based on your cluster requirements
-
-# --- Logging (optional but recommended) ---
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-
-# --- Step 1: Set up complex-leg ABFE folders ---
-abfe_setup = ABFESetup(
-    base_path=base_path,
-    ligands=ligands,
-    num_replicates=num_replicates,
-    archer_nodes=archer_nodes
-)
-abfe_setup.setup()
-
-# --- Step 2: Set up ligand-only simulations for replicate 1 of each ligand ---
-for ligand in ligands:
-    lig_dir = Path(base_path) / ligand
-    ligonly_abfe_dir = lig_dir / "abfe_van1_hrex_r1"
-
-    try:
-        logging.info(f"Starting ligand-only setup in: {ligonly_abfe_dir}")
-        setup = LigandOnlySetup(ligand_name=ligand, abfe_dir=ligonly_abfe_dir)
-        setup.setup()
-        logging.info(f"Completed ligand-only setup for {ligand} rep 1")
-    except Exception as e:
-        logging.error(f"Ligand-only setup failed for {ligand} rep 1: {e}")
+```bash
+python -m abfe.campaign --registry /absolute/campaign.sqlite prepare DATASET/LIGAND \
+  --manifest /absolute/preparation.json --stage vanilla --output /absolute/staging/vanilla --plan
 ```
 
-
+Omit `--plan` to generate staged inputs. After the three vanilla trajectories reach
+100 ns, use `--stage alchemical --output /absolute/staging/alchemical` with the same
+manifest. This generates three complex legs and one shared solvent leg, without
+submitting jobs or adopting existing runs. Identical reruns verify/reuse outputs;
+failures preserve staging and create incidents. Inspect shows preparation status.
 
 ## ABFE Analysis
 

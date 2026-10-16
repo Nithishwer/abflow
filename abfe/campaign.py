@@ -84,7 +84,7 @@ def load_manifest(path, source_root=None):
             if not re.fullmatch(r"[A-Za-z0-9_-]+", ligand_id) or ligand_id in ligand_ids:
                 raise ValueError(f"{dataset_id}: ligand IDs must be unique simple names")
             ligand_ids.add(ligand_id)
-            for key in ("vanilla_paths", "complex_paths", "embeddings"):
+            for key in ("vanilla_paths", "complex_paths"):
                 if any(repeat not in ("1", "2", "3") for repeat in ligand.get(key, {})):
                     raise ValueError(f"{dataset_id}/{ligand_id}: {key} may only map repeats 1, 2, 3")
             directory = ligand.get("directory")
@@ -108,17 +108,16 @@ def load_manifest(path, source_root=None):
                 if base:
                     vanilla = vanilla or str(Path(base) / f"vanilla_rep_{repeat}")
                     complex_path = complex_path or str(Path(base) / f"abfe_van{repeat}_hrex_r1/complex")
-                embedding = source_path(root, ligand.get("embeddings", {}).get(str(repeat)))
                 for leg, location, windows, dependencies in (
                     ("vanilla", vanilla, {}, []),
                     ("complex", complex_path, dataset.get("complex_windows", {}),
                      [f"{dataset_id}/{ligand_id}/vanilla/{repeat}", solvent_id]),
                 ):
                     specs.append(dict(common, id=f"{dataset_id}/{ligand_id}/{leg}/{repeat}", leg=leg,
-                                      repeat=repeat, path=location, embedding=embedding,
+                                      repeat=repeat, path=location,
                                       windows=windows, dependencies=dependencies))
             specs.append(dict(common, id=solvent_id, leg="solvent", repeat=None, path=solvent,
-                              embedding=None, windows=dataset.get("solvent_windows", {}),
+                              windows=dataset.get("solvent_windows", {}),
                               dependencies=[], shared_by=[f"{dataset_id}/{ligand_id}/complex/{r}" for r in (1, 2, 3)],
                               compatibility="unverified"))
     if not datasets:
@@ -198,15 +197,46 @@ def read_registry(registry):
         for row in db.execute("SELECT * FROM runs ORDER BY id"):
             rows.append({"spec": json.loads(row["spec"]), "observation": json.loads(row["observation"]) if row["observation"] else None,
                          "observed_at": row["observed_at"], "incidents": [dict(item) for item in
-                         db.execute("SELECT * FROM incidents WHERE run_id=? ORDER BY code", (row["id"],))],
+                         db.execute("SELECT * FROM incidents WHERE run_id=? AND status!='retired' ORDER BY code", (row["id"],))],
+                         "incident_history": [dict(item) for item in
+                         db.execute("SELECT * FROM incidents WHERE run_id=? AND status='retired' ORDER BY code", (row["id"],))],
                          "history": [dict(item) for item in db.execute("SELECT revision,observed_at FROM history WHERE run_id=? ORDER BY revision", (row["id"],))]})
+        if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='preparations'").fetchone():
+            prepared = {}
+            for item in db.execute("SELECT compound,record FROM preparations ORDER BY rowid"):
+                prepared[item[0]] = json.loads(item[1])
+            for row in rows:
+                compound = row['spec']['dataset'] + '/' + row['spec']['ligand']
+                if compound in prepared:
+                    row['preparation'] = prepared[compound]
         for row in rows:
-            assignment = metadata.get('embedding_labels', {}).get(row['spec']['id'])
+            assignment = metadata.get('equilibration_labels', {}).get(row['spec']['id'])
             if assignment:
-                row['embedding_assignment'] = assignment
+                row['equilibration_assignment'] = dict(assignment, kind='vanilla_equilibration_repeat')
+        for row in rows:
+            if row['observation']:
+                row['observation'].pop('embedding', None)
+                row['observation']['issues'] = [item for item in row['observation'].get('issues', [])
+                    if item['code'] not in ('embedding_provenance', 'missing_embedding', 'shared_embedding_source')]
+        specs = {row['spec']['id']: row['spec'] for row in rows}
+        for row in rows:
+            row['equilibration'] = equilibration_details(row['spec'], specs)
         from .analysis import attach
         attach(db, rows)
     return metadata, rows
+
+
+def equilibration_details(spec, specs):
+    if spec['leg'] == 'solvent':
+        return dict(state='not_applicable', repeat=None, source=None)
+    vanilla_id = f"{spec['dataset']}/{spec['ligand']}/vanilla/{spec['repeat']}"
+    source = specs.get(vanilla_id, {}).get('path')
+    result = dict(state='unverified', repeat=spec['repeat'], source=source)
+    if source:
+        path = Path(source)
+        if any((path / name).is_file() for name in ('nvt.gro', 'npt.gro')):
+            result['state'] = 'outputs_on_file'
+    return result
 
 
 def connection_state(record, at=None):
@@ -495,7 +525,6 @@ def inspect_run(spec):
                    "scheduler": {"state": "unknown", "cluster": None, "job_id": None},
                    "transfer": {"state": "unknown"},
                    "analysis": {"state": "absent", "analysed_ns": None, "convergence": "unverified"},
-                   "embedding": {"state": "not_applicable" if spec["leg"] == "solvent" else "unrecorded", "path": spec["embedding"]},
                    "windows": [], "evidence": [], "issues": [], "next_action": "Inspect inventory; execution is not enabled"}
     for item in spec["input_files"]:
         evidence(observation, Path(item), "input")
@@ -503,11 +532,6 @@ def inspect_run(spec):
             issue(observation, "missing_input:" + item, f"Declared input is missing: {item}")
     if observation["evidence"]:
         observation["stage"] = "inputs_present"
-    if spec["embedding"]:
-        embedding = Path(spec["embedding"])
-        observation["embedding"]["state"] = "declared_unverified" if embedding.exists() else "missing"
-        if not embedding.exists():
-            issue(observation, "missing_embedding", f"Declared embedding does not exist: {embedding}")
     location = Path(spec["path"]) if spec["path"] else None
     if not location or not location.exists():
         if location and spec["leg"] != "vanilla":
@@ -519,8 +543,6 @@ def inspect_run(spec):
         issue(observation, "invalid_source", f"Expected a directory: {location}")
         return observation
     observation["stage"] = "directory_present"
-    if spec["leg"] != "solvent" and not spec["embedding"]:
-        issue(observation, "embedding_provenance", "No explicit CHARMM-GUI source is recorded for this repeat; folder names do not prove independent embeddings.")
     if spec["leg"] == "vanilla":
         log = location / "prod.log"
         mdp = location / "prod.mdp"
@@ -621,12 +643,6 @@ def scan(registry, progress=None):
             if extra:
                 observation["legacy_candidates"] = extra
                 issue(observation, "unmapped_legacy_runs", f"Additional legacy ABFE directories were preserved without mapping: {extra}")
-        if spec["embedding"] and spec["leg"] != "solvent":
-            duplicates = [other["id"] for other, _ in observations if other["dataset"] == spec["dataset"]
-                          and other["ligand"] == spec["ligand"] and other["leg"] == spec["leg"]
-                          and other["repeat"] != spec["repeat"] and other["embedding"] == spec["embedding"]]
-            if duplicates:
-                issue(observation, "shared_embedding_source", f"Embedding source is also assigned to {duplicates}; independent embeddings are unverified.")
     observed_at = now()
     with closing(sqlite3.connect(registry)) as db, db:
         for spec, observation in observations:
@@ -763,7 +779,9 @@ def report_html(metadata, rows):
         dependencies = ''.join(f"<li>{escape(item)}</li>" for item in spec["dependencies"])
         jobs = ''.join(f"<li>{escape(item['cluster'])} · {escape(item['job_id'])} · {escape(item['state'])}</li>" for item in view["jobs"])
         detail = (f"<h3>{escape(spec['id'])}</h3><p>Source: {escape(spec['path'] or 'not prepared')}<br>"
-                  f"Embedding: {escape((row['embedding_assignment']['label'] + ' (run name)') if row.get('embedding_assignment') else (spec['embedding'] or ('not applicable' if spec['leg'] == 'solvent' else 'unrecorded')))}<br>"
+                  f"Equilibration repeat: {escape((row['equilibration_assignment']['label'] + ' (run name)') if row.get('equilibration_assignment') else ('van' + str(spec['repeat']) if spec['leg'] != 'solvent' else 'not applicable'))}<br>"
+                  f"Equilibration source: {escape(row.get('equilibration', {}).get('source') or 'not applicable')}<br>"
+                  f"Equilibration evidence: {escape(row.get('equilibration', {}).get('state', 'unverified'))}<br>"
                   f"Observed windows: {escape(observed.get('sampled_windows', 0))}/{escape(observed.get('expected_windows', 0))}<br>"
                   f"Observed maximum: {escape(number(observed.get('production_max_ns')))} ns<br>"
                   f"Transfer evidence: {escape(observed.get('transfer', {}).get('state', 'unknown'))}<br>"
@@ -784,6 +802,11 @@ def report_html(metadata, rows):
                        f"Cutoff basis: {escape(imported.get('duration_assignment', {}).get('rule', 'unknown'))}<br>"
                        f"Convergence: {escape(imported.get('convergence', 'unverified').replace('_', ' '))}</p>"
                        + '<pre>' + escape(json.dumps(imported.get('convergence_assessment', {}), indent=2)) + f'</pre><ul>{links}</ul>')
+        if row.get("preparation"):
+            prep = row["preparation"]
+            detail += ("<h4>Staged preparation</h4><pre>" + escape(json.dumps({
+                key: prep.get(key) for key in ("state", "at", "stage", "output", "error")
+            }, indent=2)) + "</pre>")
         if row.get("binding_result"):
             detail += ("<h4>Binding result and shared solvent</h4><pre>" +
                        escape(json.dumps(row["binding_result"], indent=2, allow_nan=False)) + "</pre>")
@@ -919,6 +942,12 @@ def main(argv=None):
     analysis.add_argument("run_id")
     analysis.add_argument("--cutoff-ns", required=True, type=float)
     analysis.add_argument("--plan", action="store_true", help="Validate inputs and record a plan without running estimators")
+    preparation = sub.add_parser("prepare", help="Prepare one compound in separate local staging; no simulation execution")
+    preparation.add_argument("compound", help="DATASET/LIGAND")
+    preparation.add_argument("--manifest", required=True, type=Path)
+    preparation.add_argument("--output", required=True, type=Path)
+    preparation.add_argument("--stage", required=True, choices=("vanilla", "alchemical"))
+    preparation.add_argument("--plan", action="store_true", help="Validate mappings/inputs without generating anything")
     historical = sub.add_parser("import-analysis", help="Import historical result CSVs with their original provenance")
     historical.add_argument("run_id")
     historical.add_argument("--plan", action="store_true", help="Preview historical records without writing")
@@ -941,6 +970,10 @@ def main(argv=None):
     try:
         if args.command == "init":
             print(f"Registered {initialize(args.registry, args.manifest, args.source_root)} runs; no source files changed.")
+        elif args.command == "prepare":
+            from .preparation import prepare
+            result = prepare(args.registry, args.compound, args.manifest, args.output, args.stage, args.plan)
+            print(json.dumps(result, indent=2, allow_nan=False))
         elif args.command == "import-analysis":
             from .analysis import import_analysis
             print(json.dumps(import_analysis(args.registry, args.run_id, args.plan), indent=2, allow_nan=False))

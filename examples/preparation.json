@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "compound": "DATASET/LIGAND",
+  "protocol": {
+    "reviewed_by": "REVIEWER",
+    "reference": "REFERENCE_PREPARATION_AND_PROTONATION",
+    "chemical_state": "LIGAND_STATE_FROM_REFERENCE",
+    "expected_charge": null,
+    "waters_and_ions": "REFERENCE_WATER_ION_AND_SALT_POLICY",
+    "charge_treatment": "EXISTING_ABFLOW_CHARGE_TREATMENT",
+    "water_model": "TIP3P",
+    "salt_molar": null,
+    "temperature_K": 298.15,
+    "protein_forcefield": {
+      "name": "AMBER99SB-ILDN",
+      "version": "VERSION_FROM_SOURCE",
+      "path": "/absolute/parameters/amber99sb-ildn.ff"
+    },
+    "ligand_forcefield": {
+      "name": "Sage",
+      "version": "VERSION_FROM_SOURCE",
+      "path": "/absolute/parameters/sage.offxml"
+    },
+    "lipid_forcefield": {
+      "name": "Lipid21",
+      "version": "VERSION_FROM_SOURCE",
+      "path": "/absolute/parameters/lipid21"
+    }
+  },
+  "inputs": {
+    "sdf": "/absolute/input/LIGAND.sdf",
+    "protein": "/absolute/input/protein",
+    "crystal_water_gro": "/absolute/input/crystal-waters.gro",
+    "solvate_water_count": null,
+    "crystal_water_count": null,
+    "solvent_box": "/absolute/input/reference-waterbox.gro",
+    "solvent_topology": "/absolute/input/reference-solvent.top",
+    "restraint_script": "/absolute/abflow/src/MDRestraintsGenerator/scripts/BoreschRestraintGMX.py",
+    "charmm_folder": "/absolute/input/charmm_gmx"
+  },
+  "repeats": {
+    "1": {
+      "vanilla": "/absolute/staging/vanilla/LIGAND/vanilla_rep_1",
+      "topology": "/absolute/staging/vanilla/LIGAND/vanilla_rep_1/topol.top"
+    },
+    "2": {
+      "vanilla": "/absolute/staging/vanilla/LIGAND/vanilla_rep_2",
+      "topology": "/absolute/staging/vanilla/LIGAND/vanilla_rep_2/topol.top"
+    },
+    "3": {
+      "vanilla": "/absolute/staging/vanilla/LIGAND/vanilla_rep_3",
+      "topology": "/absolute/staging/vanilla/LIGAND/vanilla_rep_3/topol.top"
+    }
+  }
+}

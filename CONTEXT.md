@@ -216,31 +216,79 @@ workspace `.abflow/imports/historical-convergence-20261016/`. All 90 focused tes
 ran successfully (one scientific integration test skipped); rule boundary checks passed.
 
 
-Analysis incident gate correction: `embedding_provenance` no longer blocks computing
-analysis from existing DHDLs. It stays open in the console and is included in each
-new analysis record's `open_incidents`. Other open incidents still block analysis;
-`decide` and binding retain their incident gates. This fixes the reported block for
-Deflorian OX2_43703 complex repeat 2 without resolving preparation provenance or
-changing scientific settings. The batch plan still has no separate readiness step;
-existing per-run input checks and the explicit cutoff argument remain implemented.
+Analysis, decisions and binding use the active incident list. Discontinued policy checks
+are retired under the user's tracking revision, with their original rows and audit
+backup preserved. Other open incidents continue to block affected work.
 
-Validation: 91 focused tests ran successfully (one scientific integration test skipped).
-The real OX2_43703 repeat-2 `analyse --cutoff-ns 20 --plan` now passes all 44 windows
-and returns `decision.action=analyse`; embedding provenance remains open. No estimator
-ran. The workspace retains the plan receipt and verification under
-`.abflow/milestone2-validation/43703-repeat2-analysis-plan*.json`.
+### Equilibration repeat labels
+
+`van1`, `van2` and `van3` identify the three equilibration/vanilla histories. Metadata
+`equilibration_labels` retains the user's 99 existing complex-run labels and their
+original assignment evidence. `read_registry` exposes `equilibration_assignment` and
+lightweight `equilibration` details: corresponding vanilla source and whether
+equilibration outputs are on file. Labels and files alone do not establish
+completed or independent execution. Scientific run specs and analysis records stay intact.
+
+## Minimal preparation implementation — milestone 3
+
+Implemented `prepare DATASET/LIGAND --manifest /absolute/preparation.json --stage
+vanilla|alchemical --output /absolute/staging --plan` in `abfe/preparation.py` and
+campaign CLI/Inspect. `--plan` hashes/validates inputs without writes; omitting it
+creates a separate staged preparation. No source runs, repeat labels, incidents or
+scientific results are adopted or repaired, and no jobs or MD are launched.
+
+One manifest maps three equilibration/vanilla repeats to their explicitly selected
+topologies and corresponding complex legs. It records reviewer, reference,
+chemical state/charge, exact parameter files/versions, waters/ions, salt and temperature.
+Vanilla preparation reuses SimulationSetup with the membrane input directory and reviewed
+AMBER99SB-ILDN, Sage and Lipid21 inputs. Alchemical preparation checks the three
+100 ns vanilla endpoints, uses each trajectory/topology with MDRestraintsGenerator,
+and creates exactly three complex legs plus one compatible solvent leg. The old
+nested 3×3 loop is replaced by one complex leg per vanilla repeat; extra historical
+folders are preserved. Solvent setup creates 11 Coulomb + 21 vdW windows, with vdW
+state indices offset by 11; it no longer attempts missing restraint templates.
+
+Preparation supports the existing POPC helper file layout and current TIP3P/298.15 K
+MDP templates. Those are implementation limits, not new scientific requirements.
+Other reference inputs need explicit reconciliation. The manifest must supply reviewed
+Lipid21 files; the bundled lipid files are not reclassified as Lipid21. Standard
+`amber99sb-ildn.ff` is required explicitly; legacy star/mut inputs are blocked rather
+than substituted. The standalone solvent helper also requires an explicit reviewed
+force-field path. Restraint script/topology paths are explicit because the installed
+MDRestraintsGenerator lacks the legacy helper's expected sibling `scripts` directory.
+No environment or dependency was modified.
+
+Fresh staging records intent, logs, software identity, input/source hashes and an
+output-hashed receipt. Each distinct prepared topology is compiled with GROMACS;
+all 44 complex/32 solvent window MDPs are checked for consistent state maps, targets
+and temperatures. This generates validation TPRs only. A registry lock prevents
+overlapping preparation attempts. Identical reruns rehash/reuse completed outputs;
+changed/incomplete staging or setup failures preserve evidence, append preparation
+records and open visible incidents. An open preparation incident blocks retry until
+explicit resolution. Reports show staged status without promoting source runs to Prepared.
+
+Validation covers mapping, real MDP generation, orchestration with mocked engine
+boundaries, source/output changes, failures, incident persistence, CLI preview,
+concurrent attempts and safe reruns. A real-compound preparation and full GROMACS/
+restraint integration remain pending the selected compound, preparation inputs, repeat
+equilibration evidence and reviewed protocol inputs. These changes are included in `feat: Add preparation`.
 
 
-### Manual embedding labels
+### Equilibration replaces discontinued tracking — user request, 16 October 2026
 
-At the user's request, 99 existing complex run folders now have `van1`/`van2`/`van3`
-labels extracted from `abfe_vanN_hrex_rM`: 81 Deflorian and 18 Piersanti, 33 of each
-label. SQLite metadata `embedding_labels` maps run IDs to the label, source directory,
-assignment time, user-directed basis and unverified independence. `read_registry`
-exposes `embedding_assignment`; Inspect displays `vanN (run name)`. Metadata overlays
-retain labels across scans without changing scientific run specs or invalidating an
-active analysis. The manifest's original embedding source-path mapping remains
-separate; source provenance and incidents remain open for later audit. Preserve these
-labels in milestone 3. The workspace audit/backup is under
-`.abflow/imports/manual-embedding-labels-20261016/`. All 92 focused tests ran
-successfully (one scientific integration check skipped); both reports were refreshed.
+Track equilibration repeats, their vanilla trajectories and
+corresponding complex legs. Remove the separate embedding identity/source concept from
+active manifests, monitoring, display and provenance gates. Preparation uses a single
+`inputs.charmm_folder` only when generating new vanilla membrane inputs; alchemical
+preparation needs no membrane source directory or identity record.
+
+Preparation copies the existing versioned MDPs unchanged. The user removed velocity-seed
+configuration, checks, tracking and display; do not reintroduce these requirements.
+Equilibration output files are evidence on file, not proof of completed independent
+equilibration. No simulation or input is changed by this tracking revision.
+
+The user authorized retiring the discontinued checks. Original incident rows remain
+with status `retired`, separate from active incidents; other incident gates are unchanged.
+Labels move to `equilibration_labels`. Old stored specs and immutable analysis records
+remain untouched to preserve scientific identity; legacy observation fields/checks are
+omitted from the current view. The original database is backed up before migration.

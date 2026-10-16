@@ -150,18 +150,19 @@ class AnalysisTests(unittest.TestCase):
         self.assertEqual(small['decision']['action'],'continue_target')
         self.assertEqual(analysis.current_decision(self.registry,self.complex_id)['action'],'continue_target')
 
-    def test_embedding_provenance_allows_analysis_but_stays_open(self):
+    def test_retired_checks_do_not_block_analysis_and_other_incidents_still_do(self):
         analysis.incident(self.registry,self.complex_id,'embedding_provenance','Embedding source unknown')
+        with sqlite3.connect(self.registry) as db:
+            db.execute("UPDATE incidents SET status='retired' WHERE code='embedding_provenance'")
         planned=analysis.analyse(self.registry,self.complex_id,20,plan=True)
         self.assertEqual(planned['decision']['action'],'analyse')
         record=self.analyse()
         self.assertEqual(record['state'],'validated')
-        self.assertEqual(record['open_incidents'][0]['code'],'embedding_provenance')
-        self.assertEqual(record['open_incidents'][0]['status'],'open')
+        self.assertFalse(record['open_incidents'])
         row=next(r for r in campaign.read_registry(self.registry)[1] if r['spec']['id']==self.complex_id)
-        self.assertEqual(row['incidents'][0]['status'],'open')
-        self.assertEqual(campaign.presentation(row,campaign.read_registry(self.registry)[0])['remarks'],'Attention required')
-        self.assertEqual(analysis.current_decision(self.registry,self.complex_id)['action'],'blocked')
+        self.assertFalse(row['incidents'])
+        self.assertEqual(row['incident_history'][0]['status'],'retired')
+        self.assertEqual(analysis.current_decision(self.registry,self.complex_id)['action'],'stop_converged')
         analysis.incident(self.registry,self.complex_id,'unexpected_data_issue','Needs review')
         with patch('abfe.analysis.run_analysis') as backend:
             result=analysis.analyse(self.registry,self.complex_id,20)
@@ -234,6 +235,7 @@ class AnalysisTests(unittest.TestCase):
 
     def test_scan_preserves_records_and_keeps_incidents_open(self):
         record=self.analyse()
+        analysis.incident(self.registry,self.complex_id,'restraint_provenance','Needs explicit review')
         campaign.scan(self.registry)
         _,rows=campaign.read_registry(self.registry)
         row=next(r for r in rows if r['spec']['id']==self.complex_id)
@@ -346,7 +348,7 @@ class AnalysisTests(unittest.TestCase):
     def test_historical_import_preserves_validated_analysis_and_open_incidents(self):
         managed=self.analyse()
         self.historical_files()
-        analysis.incident(self.registry,self.complex_id,'embedding_provenance','Existing unresolved provenance')
+        analysis.incident(self.registry,self.complex_id,'restraint_provenance','Existing unresolved provenance')
         analysis.import_analysis(self.registry,self.complex_id)
         row=next(r for r in campaign.read_registry(self.registry)[1] if r['spec']['id']==self.complex_id)
         self.assertEqual(row['analysis_record']['id'],managed['id'])

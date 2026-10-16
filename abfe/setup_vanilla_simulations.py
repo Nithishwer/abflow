@@ -24,9 +24,13 @@ submission_script_templates = files(
 )
 
 
+
+
 class SimulationSetup:
     def __init__(self, base_path, charmm_folder, protein_folder, sdf_folder,
-                 crystal_water_gro, solvate_water_count=10286, crystal_water_count=136, num_nodes=2):
+                 crystal_water_gro, solvate_water_count=10286, crystal_water_count=136, num_nodes=2, *, forcefield_path=None,
+                 sage_offxml="openff-2.0.0.offxml", lipid_dir=None,
+                 solvent_box="spc216.gro", salt_molar=None, write_job_scripts=True):
         self.base_path = Path(base_path)
         self.charmm_folder = Path(charmm_folder)
         self.protein_folder = Path(protein_folder)
@@ -35,14 +39,20 @@ class SimulationSetup:
         self.solvate_water_count = solvate_water_count
         self.crystal_water_count = crystal_water_count
         self.num_nodes = num_nodes
+        self.forcefield_path = forcefield_path
+        self.sage_offxml = sage_offxml
+        self.lipid_dir = lipid_dir
+        self.solvent_box = solvent_box
+        self.salt_molar = salt_molar
+        self.write_job_scripts = write_job_scripts
 
-    def setup_simulation(self, compound_name, replicate: int = 1):
+    def setup_simulation(self, compound_name, replicate: int = 1, *, output_path=None):
         complex_folder = self.base_path / f"complex_{compound_name}"   ## Refactor for different compound names
         
         # name each repeat folder “vanilla_rep_N”
         vanilla_name = f"vanilla_rep_{replicate}"
-        vanilla_path = complex_folder / vanilla_name
-        vanilla_path.mkdir(parents=True, exist_ok=True)
+        vanilla_path = Path(output_path).resolve() if output_path else complex_folder / vanilla_name
+        vanilla_path.mkdir(parents=True)
 
         sdf_file = self.sdf_folder / f"{compound_name}.sdf"
         shutil.copy(sdf_file, vanilla_path)
@@ -56,43 +66,6 @@ class SimulationSetup:
         print(f"Setup complete in {vanilla_path}")
         self.run_vanilla_setup(vanilla_path, compound_name)
 
-#    def run_vanilla_setup(self, vanilla_path, compound_name):
-#        os.chdir(vanilla_path)
-#        sdf_file = f"{compound_name}.sdf"
-
-        # Helper functions
-#        param_lig(sdf_file)
-#        self.copy_parameterized_protein()
-#        organize_topologies()
-#        addligtop(sdf_file)
-#        addliggro(sdf_file)
-#        addligposres(sdf_file)
-
-        
-#        charmm_gro = os.path.join(self.charmm_folder, "step5_input.gro")
-#        membrane_out = os.path.join(vanilla_path, "membrane.gro")
-#        extract_membrane_from_charmm(charmm_gro, membrane_out)
-        
-        
-#        copy_complex2membrane()
-#        addmemtop(sdf_file)
-#        solvate_system(self.solvate_water_count)  
-#        cp_mdps(mdp_dir)  
-
-#        merge_gro_files('solv_fix.gro', self.crystal_water_gro.resolve())
-
-
-        #add_water2topology(self.crystal_water_count)
-
-#        update_topol_top_with_molecules_block('solv_fix_crystal_water.gro')
-
-
-#        addions('solv_fix_crystal_water.gro')  ## output from water_deletor.pl in solvate_system
-#        create_index('system_solv_ions.gro')  ## output from addions
-#        addtoppar2top("topol.top")  ## make specific?
-#        copy_jobscripts_vanilla(submission_script_templates, compound_name, self.num_nodes) 
-#        os.chdir('..')
-
     def run_vanilla_setup(self, vanilla_path: Path, compound_name: str) -> None:
         """
         Perform all steps needed to prepare a vanilla membrane–protein simulation.
@@ -104,10 +77,14 @@ class SimulationSetup:
             sdf_filename = f"{compound_name}.sdf"
 
             # parameterise the ligand (creates smirnoff/bespokefit folder)
-            param_lig(sdf_filename)
+            param_lig(sdf_filename, sage_offxml=self.sage_offxml)
 
             # copy protein parameter files into the working directory
             self.copy_parameterized_protein()
+            if self.forcefield_path is not None:
+                ff = Path(self.forcefield_path)
+                if not Path(ff.name).exists():
+                    shutil.copytree(ff, ff.name)
 
             # organise ligand/protein .itp files into a toppar directory
             organize_topologies()
@@ -126,10 +103,10 @@ class SimulationSetup:
             copy_complex2membrane()
 
             # include membrane .itp files and POPC count in the topology
-            addmemtop(sdf_filename)
+            addmemtop(sdf_filename, lipid_dir=self.lipid_dir)
 
             # solvate the system (generates solv.gro and solv_fix.gro)
-            solvate_system(self.solvate_water_count)
+            solvate_system(self.solvate_water_count, solvent_box=self.solvent_box)
 
             # copy mdp files into the working directory
             cp_mdps(mdp_dir)
@@ -147,7 +124,7 @@ class SimulationSetup:
             add_water2topology(self.crystal_water_count)           
 
             # now add ions; gmx grompp will find matching numbers
-            addions("solv_fix_crystal_water.gro")
+            addions("solv_fix_crystal_water.gro", water_group="SOL", salt_molar=self.salt_molar)
 
             # create an index file for later MD runs
             create_index("system_solv_ions.gro")
@@ -156,7 +133,8 @@ class SimulationSetup:
             addtoppar2top("topol.top")
 
             # write job scripts for submission
-            copy_jobscripts_vanilla(submission_script_templates, compound_name, self.num_nodes)
+            if self.write_job_scripts:
+                copy_jobscripts_vanilla(submission_script_templates, compound_name, self.num_nodes)
 
 
 

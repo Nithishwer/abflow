@@ -1,153 +1,92 @@
-import os
 import logging
-import sys
 from pathlib import Path
-from typing import List
 from importlib.resources import files
 
 from abfe.utils.abfe_helpers_hrex import (
-    generate_boresch_restraints,
-    copy_complex,
-    create_fep_system,
-    create_index,
-    create_directories_with_MDP_pertuball_smaller_dumps,
-    create_simulations_list,
-    gen_hrex_submission_script
+    generate_boresch_restraints, copy_complex, create_fep_system, create_index,
+    create_directories_with_MDP_pertuball_smaller_dumps, create_simulations_list,
+    gen_hrex_submission_script,
 )
-
-from abfe.utils.ligand_only_setup import LigandOnlySetup
-#LigandOnlySetup(ligand_name="unk", abfe_dir=Path("abfe_van1_hrex_r1")).setup()
+from abfe.utils.utils import working_directory
 
 
 class ABFESetup:
-    """
-    ABFESetup handles the preparation of folders for ABFE simulations.
-    """
+    """Prepare one complex leg per vanilla repeat, preserving historical folders."""
 
-    def __init__(self, base_path: str, ligands: List[str], num_replicates: int, archer_nodes: int = 22):
+    def __init__(self, base_path, ligands, num_replicates, archer_nodes=22, *,
+                 vanilla_paths=None, forcefield_path=None, write_job_scripts=True,
+                 expected_charge=None, restraint_script=None, topology_paths=None):
         self.base_path = Path(base_path).resolve()
         self.ligands = ligands
         self.num_replicates = num_replicates
         self.archer_nodes = archer_nodes
-
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler('setup_abfe.log'),
-                logging.StreamHandler()
-            ]
-        )
-        logging.info(f"Initialized ABFESetup with base_path: {self.base_path}")
+        self.vanilla_paths = vanilla_paths
+        self.forcefield_path = forcefield_path
+        self.write_job_scripts = write_job_scripts
+        self.expected_charge = expected_charge
+        self.restraint_script = restraint_script
+        self.topology_paths = topology_paths
 
     def setup(self):
+        if self.num_replicates < 1:
+            raise ValueError("num_replicates must be positive")
         for ligand in self.ligands:
             ligand_dir = self.base_path / ligand
-            if not ligand_dir.exists():
-                logging.warning(f"Ligand directory not found: {ligand_dir}")
-                continue
+            for repeat in range(1, self.num_replicates + 1):
+                vanilla = (Path(self.vanilla_paths[repeat]).resolve() if self.vanilla_paths
+                           else ligand_dir / f"vanilla_rep_{repeat}")
+                if not vanilla.is_dir():
+                    raise FileNotFoundError(f"Missing vanilla repeat {repeat}: {vanilla}")
+                if self.topology_paths:
+                    self._setup_abfe_folder(ligand_dir, f"van{repeat}_hrex_r1", vanilla,
+                                            topology_path=self.topology_paths[repeat])
+                else:
+                    self._setup_abfe_folder(ligand_dir, f"van{repeat}_hrex_r1", vanilla)
 
-            logging.info(f"Setting up ABFE folders for ligand: {ligand}")
-
-            # Find all vanilla_rep_* folders
-            vanilla_folders = sorted([f for f in ligand_dir.glob("vanilla_rep_*") if f.is_dir()])
-
-            for vanilla_folder in vanilla_folders:
-                try:
-                    # Extract the index from the folder name: vanilla_rep_1 -> 1
-                    vanilla_index = int(vanilla_folder.name.split("_")[-1])
-                except ValueError:
-                    logging.warning(f"Could not parse index from folder name: {vanilla_folder.name}")
-                    continue
-
-                for rep in range(1, self.num_replicates + 1):
-                    suffix = f"van{vanilla_index}_hrex_r{rep}"
-                    self._setup_abfe_folder(ligand_dir, suffix, vanilla_folder.name)
-
-
-    def _setup_abfe_folder(self, ligand_dir: Path, suffix: str, vanilla_folder_name: str):
-        try:
-            ligname = ligand_dir.name
-            abfe_folder = ligand_dir / f"abfe_{suffix}"
-
-            if abfe_folder.exists():
-                logging.warning(f"{abfe_folder} already exists. Skipping...")
-                return
-
-            abfe_folder.mkdir(exist_ok=True)
-            complex_path = abfe_folder / "complex"
-            complex_path.mkdir(exist_ok=True)
-            logging.info(f"Created folder: {abfe_folder} and {complex_path}")
-            os.chdir(complex_path)  # << all operations now run inside complex/
-
-
-            vanilla_path = ligand_dir / vanilla_folder_name
-            if not vanilla_path.exists():
-                logging.error(f"Vanilla directory does not exist: {vanilla_path}")
-                return
-
-            generate_boresch_restraints(vanilla_folder_name=vanilla_path, abfe_path=abfe_folder)
-
-            copy_complex(vanilla_folder_name=vanilla_path, abfe_path=abfe_folder)
-            create_fep_system(ligname, vanilla_path)
+    def _setup_abfe_folder(self, ligand_dir, suffix, vanilla_folder_name, topology_path=None):
+        abfe_folder = ligand_dir / f"abfe_{suffix}"
+        if abfe_folder.exists():
+            logging.warning("%s already exists; preserving it", abfe_folder)
+            return
+        complex_path = abfe_folder / "complex"
+        complex_path.mkdir(parents=True)
+        vanilla = (ligand_dir / vanilla_folder_name).resolve()
+        with working_directory(complex_path):
+            generate_boresch_restraints(vanilla_folder_name=vanilla, abfe_path=abfe_folder,
+                                        restraint_script=self.restraint_script, topology_path=topology_path)
+            copy_complex(vanilla_folder_name=vanilla, abfe_path=abfe_folder,
+                         forcefield_path=self.forcefield_path, topology_path=topology_path)
+            create_fep_system(ligand_dir.name, vanilla, expected_charge=self.expected_charge)
             create_index("complex_coul.gro", "index.ndx")
-            protein_membrane_ligand_index = "Protein_unk_PA_PC_OL"
-            water_ion_alch_ion_index = "Water_and_ions"
-
-            for phase in ['coul', 'rest', 'vdw']:
+            for phase in ('rest', 'coul', 'vdw'):
                 create_directories_with_MDP_pertuball_smaller_dumps(
-                    phase, protein_membrane_ligand_index, water_ion_alch_ion_index
-                )
-
+                    phase, "Protein_unk_PA_PC_OL", "Water_and_ions")
             create_simulations_list()
-            simulation_list_string = ' '.join([
-                f"{phase}.{i:02d}/$STEP/" for phase in ['rest', 'coul', 'vdw']
-                for i in range(21 if phase == 'vdw' else 12 if phase == 'rest' else 11)
-            ])
-
-            gen_hrex_submission_script(
-                template_path=files("abfe.utils.cluster.job_script_template.abfe") / "job_complex_archer_hrex_template.sh",
-                job_name=ligname,
-                archer_nodes=self.archer_nodes,
-                simulation_list_string=simulation_list_string
-            )
-
-            gen_hrex_submission_script(   
-                template_path=files("abfe.utils.cluster.job_script_template.abfe") / "job_complex_archer_hrex_cont_template.sh",
-                new_script_name='job_complex_archer_contd.sh',
-                job_name=ligname,
-                archer_nodes=self.archer_nodes,
-                simulation_list_string=simulation_list_string
-            )
-
-            (complex_path / 'plumed.dat').touch()
-
-
-            logging.info(f"ABFE folder setup completed for {ligname} replicate {suffix}")
-
-        except Exception as e:
-            logging.error(f"Error setting up ABFE folder for {ligand_dir.name} replicate {suffix}: {e}")
-            raise
+            if self.write_job_scripts:
+                simulation_list = ' '.join(
+                    f"{phase}.{i:02d}/$STEP/" for phase, count in
+                    (('rest', 12), ('coul', 11), ('vdw', 21)) for i in range(count))
+                templates = files("abfe.utils.cluster.job_script_template.abfe")
+                for template, destination in (
+                    ("job_complex_archer_hrex_template.sh", "job_complex_archer.sh"),
+                    ("job_complex_archer_hrex_cont_template.sh", "job_complex_archer_contd.sh")):
+                    gen_hrex_submission_script(
+                        template_path=templates / template, new_script_name=destination,
+                        job_name=ligand_dir.name, archer_nodes=self.archer_nodes,
+                        simulation_list_string=simulation_list)
+            (complex_path / "plumed.dat").touch()
 
 
 def main():
     import argparse
-
-    parser = argparse.ArgumentParser(description="Setup ABFE folders for multiple ligands and replicates.")
-    parser.add_argument('--base_path', required=True, help='Base path containing ligand folders.')
-    parser.add_argument('--ligands', nargs='+', required=True, help='Ligand folder names to process.')
-    parser.add_argument('--num_replicates', type=int, default=3, help='Number of replicates to setup per ligand.')
-    parser.add_argument('--archer_nodes', type=int, default=22, help='Number of nodes to use in scripts.')
-
+    parser = argparse.ArgumentParser(description=ABFESetup.__doc__)
+    parser.add_argument('--base_path', required=True)
+    parser.add_argument('--ligands', nargs='+', required=True)
+    parser.add_argument('--num_replicates', type=int, default=3,
+                        help='Total complex repeats per ligand, one per vanilla repeat')
+    parser.add_argument('--archer_nodes', type=int, default=22)
     args = parser.parse_args()
-
-    setup = ABFESetup(
-        base_path=args.base_path,
-        ligands=args.ligands,
-        num_replicates=args.num_replicates,
-        archer_nodes=args.archer_nodes
-    )
-    setup.setup()
+    ABFESetup(args.base_path, args.ligands, args.num_replicates, args.archer_nodes).setup()
 
 
 if __name__ == "__main__":

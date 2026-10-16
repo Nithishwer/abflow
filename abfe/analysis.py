@@ -351,8 +351,7 @@ def analyse(registry, run_id, cutoff_ns, plan=False):
     check_destination(registry, metadata_, [r['spec'] for r in rows])
     output_root = registry.parent / 'analyses'
     check_destination(output_root, metadata_, [r['spec'] for r in rows])
-    # Embedding independence gates production/final adoption, not reading existing DHDLs.
-    blocking = [item for item in row['incidents'] if item['status'] == 'open' and item['code'] != 'embedding_provenance']
+    blocking = [item for item in row['incidents'] if item['status'] == 'open']
     if blocking:
         return dict(action='blocked', reason='Open incidents require explicit resolution: ' +
                     ', '.join(item['code'] for item in blocking), next_target_ns=None)

@@ -270,7 +270,7 @@ def add_unk_to_topol(filename):
         print(f"Error: {e}")
 
 
-def param_lig(file_name, xml_file=None):
+def param_lig(file_name, xml_file=None, sage_offxml="openff-2.0.0.offxml"):
     """
     Creates a directory structure and smirnoff parameterizes the ligand
     """
@@ -294,7 +294,7 @@ def param_lig(file_name, xml_file=None):
         raise FileNotFoundError(f"Error: File '{file_name}' not found in the parent directory.")
 
     if mode == 'smirnoff':
-        smirnoff_parameterize(file_name)
+        smirnoff_parameterize(file_name, forcefield=sage_offxml)
     else:
         bespokefit_parameterize(file_name, xml_file)
     
@@ -463,7 +463,7 @@ def includememtop(patterns, lines_to_add):
     p = get_popc_number('charmm_gmx/topol.top')
     add_POPC_to_topol('topol.top', p)
 
-def addmemtop(lig_filename):
+def addmemtop(lig_filename, lipid_dir=None):
     """
     Adds the membrane itp files to the topol.top file
     """
@@ -472,6 +472,9 @@ def addmemtop(lig_filename):
     # Resolve path to the forcefield_dir relative to this file (gromacs_helpers_single_chain.py)
     script_dir = os.path.dirname(os.path.abspath(__file__))
     forcefield_dir = os.path.join(script_dir, "data", "forcefield_dir")
+
+    if lipid_dir is not None:
+        forcefield_dir = str(lipid_dir)
 
     # Define the source and destination file paths
     source_files = [
@@ -552,13 +555,13 @@ def gnrt_protposres(gro_file):
     # Command 4: Generate position restraint file for backbone atoms
     result = subprocess.run(f"echo 4 | gmx genrestr -f chain1.gro -o toppar/posres_bb.itp", shell=True, check=True)
 
-def solvate_system(water_count = 0):
+def solvate_system(water_count=0, solvent_box="spc216.gro"):
     """
     Solvates the system and deletes water molecules in the membrane
     """
     # Execute gmx solvate command
     try:
-        subprocess.run(["gmx", "solvate", "-cp", "complex_membrane.gro", "-cs", "spc216.gro", "-p", "topol.top", "-o", "solv.gro"], check=True)
+        subprocess.run(["gmx", "solvate", "-cp", "complex_membrane.gro", "-cs", str(solvent_box), "-p", "topol.top", "-o", "solv.gro"], check=True)
     except subprocess.CalledProcessError:
         raise Exception("Error: gmx solvate command failed.")
     
@@ -634,7 +637,7 @@ def update_topology_file(new_water_count: int = 0):
 
 
 
-def addions(input_file = "solv_fix.gro",water_group = '18'):
+def addions(input_file="solv_fix.gro", water_group="18", salt_molar=None):
     """
     Executes gromacs commands to add ions to the system
     """
@@ -647,7 +650,10 @@ def addions(input_file = "solv_fix.gro",water_group = '18'):
     # Execute gmx genion command
     try:
         process_input = water_group.encode()
-        subprocess.run(["gmx", "genion", "-s", "ions.tpr", "-o", "system_solv_ions.gro", "-p", "topol.top", "-pname", "NA", "-nname", "CL", "-neutral"],input = process_input, check=True)
+        command = ["gmx", "genion", "-s", "ions.tpr", "-o", "system_solv_ions.gro", "-p", "topol.top", "-pname", "NA", "-nname", "CL", "-neutral"]
+        if salt_molar is not None:
+            command += ["-conc", str(salt_molar)]
+        subprocess.run(command, input=process_input, check=True)
     except subprocess.CalledProcessError:
         raise Exception("Error: gmx genion command failed.")
     

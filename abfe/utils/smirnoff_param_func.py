@@ -21,7 +21,7 @@ import openff.toolkit
 from openff.toolkit.topology import Molecule, Topology
 from openff.toolkit.typing.engines.smirnoff import ForceField
 
-def smirnoff_parameterize(ligand_path):
+def smirnoff_parameterize(ligand_path, forcefield="openff-2.0.0.offxml"):
 
     ligand_name = ligand_path.split('.')[0]
 
@@ -36,7 +36,7 @@ def smirnoff_parameterize(ligand_path):
     omm_forcefield = openmm.app.ForceField("amber99sb.xml", "tip3p.xml")
     # Teach OpenMM about the ligand molecule and the Sage force field
     smirnoff = SMIRNOFFTemplateGenerator(
-        forcefield="openff-2.0.0.offxml", molecules=[ligand]
+        forcefield=str(forcefield), molecules=[ligand]
     )
     omm_forcefield.registerTemplateGenerator(smirnoff.generator)
 
