@@ -12,9 +12,9 @@
     "salt_molar": null,
     "temperature_K": 298.15,
     "protein_forcefield": {
-      "name": "AMBER99SB-ILDN",
+      "name": "amber99sb-star-ildn-mut.ff",
       "version": "VERSION_FROM_SOURCE",
-      "path": "/absolute/parameters/amber99sb-ildn.ff"
+      "path": "/absolute/parameters/amber99sb-star-ildn-mut.ff"
     },
     "ligand_forcefield": {
       "name": "Sage",

@@ -194,3 +194,30 @@ ABFLOW_SCIENTIFIC_TEST=1 python -m unittest \
   abfe.tests.test_analysis abfe.tests.test_campaign \
   abfe.tests.test_cluster_capacity abfe.tests.test_cluster_monitor
 ```
+
+## Cluster execution
+
+Copy `examples/execution-gpu.json` or `examples/execution-archer.json` and replace the
+source, executable, concurrency and storage estimates with reviewed values.
+Profiles that load modules generate a Bash login shell so initialization does not
+depend on the environment inherited from the submitting SSH session.
+ABFlow runs on the workstation: it copies the bundle with rsync, verifies checksums,
+calls `sbatch` over SSH and records the returned job ID. The generated `job.sh` runs
+GROMACS directly; no Python runner is copied or started on the cluster. Native
+checkpoints and small checksum/status files support continuation and retrieval.
+Existing worker-based plans remain historical records; create a new plan to use
+the plain scripts. Scientific targets, window schedules and convergence rules are unchanged.
+
+```bash
+python -m abfe.campaign --registry "$REGISTRY" cluster-plan "$RUN" --manifest /absolute/execution.json
+python -m abfe.campaign --registry "$REGISTRY" cluster-action ACTION_ID --operation stage
+python -m abfe.campaign --registry "$REGISTRY" cluster-action ACTION_ID --operation stage --apply
+python -m abfe.campaign --registry "$REGISTRY" cluster-action ACTION_ID --operation submit --apply
+python -m abfe.campaign --registry "$REGISTRY" cluster-action ACTION_ID --operation monitor
+python -m abfe.campaign --registry "$REGISTRY" cluster-action ACTION_ID --operation retrieve --output /absolute/new/snapshot --apply
+```
+
+Workloads: `vanilla`, `complex-equilibration` (FEP windows), `solvent`,
+`complex-production` (ARCHER HREX only). Modes: `initial`, `continue`, `extend`.
+Plans/scripts are saved beside the registry under `executions/ACTION_ID/`.
+Retrieval preserves a separate snapshot; it does not replace registered source runs.

@@ -808,5 +808,74 @@ class CampaignTests(unittest.TestCase):
         self.assertTrue(all(not row["history"] for row in rows))
 
 
+    def test_refresh_matches_managed_paths_after_manual_monitor_expires(self):
+        self.initialize()
+        metadata, rows = campaign.read_registry(self.registry)
+        row = next(r for r in rows if r['spec']['id'] == 'test/L1/complex/1')
+        remote = '/home/reub0138/abflow/test/L1/complex/1/action'
+        older = (datetime.now(timezone.utc) - timedelta(minutes=11)).isoformat()
+        checked = campaign.now()
+        row['executions'] = [dict(state='active', plan=dict(id='action', remote=remote,
+            output=str(self.work/'action'), fingerprint='fixture', config=dict(cluster='ranvier',
+            workload='complex-equilibration',mode='initial')), observation=dict(at=older,
+            jobs=[dict(job_id='42',state='PENDING',work_dir=remote)]))]
+        metadata['connections'] = dict(ranvier=dict(state='connected',checked_at=checked,
+            scheduler=dict(state='observed',jobs=[dict(job_id='42',state='RUNNING',work_dir=remote+'/coul.00'),
+                dict(job_id='99',state='RUNNING',work_dir=remote+'-other')])) )
+        view = campaign.presentation(row, metadata)
+        self.assertEqual((view['job_id'],view['location'],view['scheduler_state'],view['remarks']),
+                         ('42','ranvier','Running','OK'))
+        self.assertEqual(view['jobs'][0]['observed_at'],checked)
+        self.assertEqual(view['convergence'],'unverified')
+        report = campaign.report_html(metadata,rows)
+        self.assertIn('Sort by Scheduler, ascending',report)
+        self.assertIn('<td class="scheduler">Running</td>',report)
+        self.assertIn("querySelector('.scheduler').textContent='Unknown'",report)
+        self.assertIn('Scheduler',campaign.status(metadata,rows))
+        metadata['connections']['ranvier']['checked_at'] = older
+        self.assertEqual(campaign.presentation(row,metadata)['scheduler_state'],'Unknown')
+
+    def test_latest_queue_observation_overrides_older_pending_execution(self):
+        self.initialize()
+        metadata,rows = campaign.read_registry(self.registry)
+        row = next(r for r in rows if r['spec']['id'] == 'test/L1/complex/1')
+        remote = '/home/reub0138/abflow/test/L1/complex/1/action'
+        older = (datetime.now(timezone.utc)-timedelta(minutes=2)).isoformat()
+        newer = campaign.now()
+        execution = dict(state='active',plan=dict(remote=remote,config=dict(cluster='ranvier')),
+            observation=dict(at=older,jobs=[dict(job_id='42',state='PENDING',work_dir=remote)]))
+        row['executions'] = [execution]
+        metadata['connections'] = dict(ranvier=dict(state='connected',checked_at=newer,
+            scheduler=dict(state='observed',jobs=[])))
+        self.assertEqual(campaign.presentation(row,metadata)['scheduler_state'],'Unknown')
+        # Submission followed by a manual observation can be newer than the cached cluster sample.
+        execution['observation']['at'] = newer
+        metadata['connections']['ranvier']['checked_at'] = older
+        view = campaign.presentation(row,metadata)
+        self.assertEqual((view['scheduler_state'],view['stage']),('Pending','queued'))
+        self.assertEqual(view['jobs'][0]['observed_at'],newer)
+        metadata['connections']['ranvier']['checked_at'] = newer
+        self.assertEqual(campaign.presentation(row,metadata)['scheduler_state'],'Pending')
+
+    @patch('abfe.campaign.probe_cluster')
+    @patch('abfe.campaign.sample_slot', return_value=1200)
+    def test_periodic_sampler_republishes_managed_job_identity(self,slot,probe):
+        self.initialize()
+        from abfe.execution import save
+        remote='/home/reub0138/abflow/test/L1/complex/1/action'
+        old=(datetime.now(timezone.utc)-timedelta(minutes=11)).isoformat()
+        plan=dict(id='action',run_id='test/L1/complex/1',remote=remote,output=str(self.work/'action'),
+            fingerprint='fixture',config=dict(cluster='ranvier',workload='complex-equilibration',mode='initial'))
+        save(self.registry,plan,'active',observation=dict(at=old,jobs=[]))
+        probe.return_value=dict(state='connected',checked_at=campaign.now(),scheduler=dict(state='observed',
+            jobs=[dict(job_id='42',state='RUNNING',work_dir=remote)]))
+        output=self.work/'published'
+        self.assertTrue(campaign.sample_clusters(self.registry,output))
+        report=(output/'preview.html').read_text()
+        self.assertIn('<td class="scheduler">Running</td>',report)
+        self.assertIn('ranvier · 42 · RUNNING',report)
+        self.assertEqual(probe.call_count,3)
+
+
 if __name__ == "__main__":
     unittest.main()

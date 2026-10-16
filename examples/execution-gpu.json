@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "run_id": "deflorian-set1/OX2_48845/complex/3",
+  "source": "/absolute/prepared/OX2_48845/abfe_van3_hrex_r1",
+  "relative_run": "complex",
+  "workload": "complex-equilibration",
+  "mode": "initial",
+  "cluster": "ranvier",
+  "partition": "g-ran",
+  "gpu": "A40",
+  "array_concurrency": 1,
+  "walltime_hours": 24,
+  "output_reserve_bytes": 10737418240,
+  "modules": ["GROMACS/2023.1-foss-2022a-CUDA-11.7.0"],
+  "gromacs": "/absolute/verified/path/to/gmx",
+  "gromacs_version": "2023.1"
+}

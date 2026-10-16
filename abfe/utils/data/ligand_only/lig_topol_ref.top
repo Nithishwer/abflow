@@ -1,10 +1,10 @@
 ;
 ; Template ligand.top file
-; FFs: Gaff(2) + 99SBildn tip3p
+; FFs: OpenFF Sage + amber99sb-star-ildn-mut.ff, TIP3P
 ;
 
 ; Include FF paramters
-#include "amber99sb-ildn.ff/forcefield.itp"
+#include "amber99sb-star-ildn-mut.ff/forcefield.itp"
 
 ; Add ligand atom types
 #include "toppar/$SUFFIX$_atomtypes.itp"
@@ -19,7 +19,7 @@
 
 ; Water section
 ; Include water topology
-#include "amber99sb-ildn.ff/tip3p.itp"
+#include "amber99sb-star-ildn-mut.ff/tip3p.itp"
 
 #ifdef POSRES_WATER
 ; Position restraint for each water oxygen
@@ -29,7 +29,7 @@
 #endif
 
 ; Include topology for ions
-#include "amber99sb-ildn.ff/ions.itp"
+#include "amber99sb-star-ildn-mut.ff/ions.itp"
 
 
 [ system ]

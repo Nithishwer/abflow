@@ -1,4 +1,4 @@
-"""Read-only campaign inventory. Writes only its own registry and reports."""
+"""Campaign registry, console and explicit workflow commands."""
 
 import argparse
 import base64
@@ -223,6 +223,8 @@ def read_registry(registry):
             row['equilibration'] = equilibration_details(row['spec'], specs)
         from .analysis import attach
         attach(db, rows)
+        from .execution import attach as attach_executions
+        attach_executions(db, rows)
     return metadata, rows
 
 
@@ -381,6 +383,24 @@ def presentation(row, metadata):
                 directory = PurePosixPath(job["work_dir"])
                 if directory == expected or expected in directory.parents:
                     matches.append(dict(job, cluster=alias))
+    for execution in row.get("executions", []):
+        observation = execution.get("observation") or {}
+        alias = execution['plan']['config']['cluster']
+        connection = metadata.get('connections', {}).get(alias, {})
+        live = (connection_state(connection) == 'connected' and
+                connection.get('scheduler', {}).get('state') == 'observed')
+        monitored = (execution['state'] == 'active' and connection_state(
+            {'state': 'connected', 'checked_at': observation.get('at')}) == 'connected')
+        # Use the newest fresh evidence; a newer empty queue must retire an older match.
+        if live and (not monitored or datetime.fromisoformat(connection['checked_at'].replace('Z', '+00:00')) >
+                     datetime.fromisoformat(observation['at'].replace('Z', '+00:00'))):
+            expected = PurePosixPath(execution['plan']['remote'])
+            for job in connection['scheduler']['jobs']:
+                directory = PurePosixPath(job['work_dir'])
+                if directory == expected or expected in directory.parents:
+                    matches.append(dict(job, cluster=alias, observed_at=connection['checked_at']))
+        elif monitored:
+            matches.extend(dict(job, cluster=alias, observed_at=observation['at']) for job in observation.get('jobs', []))
     # A local file or an absent queue match does not establish where a calculation is running.
     scheduler = observed.get("scheduler", {})
     if not matches and connection_state({"state": "connected", "checked_at": scheduler.get("observed_at")}) == "connected":
@@ -388,6 +408,7 @@ def presentation(row, metadata):
             matches.append(dict(scheduler, job_id=str(scheduler["job_id"]), state=scheduler.get("state", "unknown")))
     job_ids = [item["job_id"] for item in matches]
     locations = sorted({item["cluster"] for item in matches})
+    scheduler_state = ', '.join(dict.fromkeys(item['state'].replace('_', ' ').title() for item in matches)) or 'Unknown'
     complete = observed.get("completion") == "validated" and observed.get("transfer", {}).get("state") == "verified_local"
     completion_conflict = complete and bool(matches)
     complete = complete and not matches
@@ -422,7 +443,7 @@ def presentation(row, metadata):
             "repeat": 1 if spec["leg"] == "solvent" else spec["repeat"], "stage": stage, "stage_label": STAGES[stage][0],
             "convergence": "N/A" if vanilla else convergence,
             "job_id": ", ".join(dict.fromkeys(job_ids)) or "Unknown", "location": ", ".join(locations) or "Unknown",
-            "remarks": remarks, "jobs": matches}
+            "scheduler_state": scheduler_state, "remarks": remarks, "jobs": matches}
 
 
 def issue(observation, code, message):
@@ -525,7 +546,7 @@ def inspect_run(spec):
                    "scheduler": {"state": "unknown", "cluster": None, "job_id": None},
                    "transfer": {"state": "unknown"},
                    "analysis": {"state": "absent", "analysed_ns": None, "convergence": "unverified"},
-                   "windows": [], "evidence": [], "issues": [], "next_action": "Inspect inventory; execution is not enabled"}
+                   "windows": [], "evidence": [], "issues": [], "next_action": "Inspect inventory; use cluster-plan for explicit execution"}
     for item in spec["input_files"]:
         evidence(observation, Path(item), "input")
         if not Path(item).is_file():
@@ -681,11 +702,11 @@ def status(metadata, rows):
         view = presentation(row, metadata)
         cells.append([row["spec"]["id"], view["simulation_type"], view["leg"], view["repeat"], view["stage_label"],
                       number(observed.get("production_ns")), number(observed.get("analysis", {}).get("analysed_ns")),
-                      view["convergence"], view["job_id"], view["location"], view["remarks"]])
-    result += [table(["Run", "Simulation type", "Leg", "Repeat", "Stage", "Prod ns*", "Analysed ns", "Convergence", "Job ID", "Location", "Remarks"], cells),
+                      view["convergence"], view["scheduler_state"], view["job_id"], view["location"], view["remarks"]])
+    result += [table(["Run", "Simulation type", "Leg", "Repeat", "Stage", "Prod ns*", "Analysed ns", "Convergence", "Scheduler", "Job ID", "Location", "Remarks"], cells),
                "", "*Production endpoints are inventory evidence, not validation of samples or an analysed cutoff.",
                "Unknown job IDs/locations are not inferred from local files. Vanilla convergence is N/A.",
-               "Use 'show RUN_ID' for evidence, dependencies, incidents and history. No execution actions are enabled."]
+               "Use 'show RUN_ID' for evidence, dependencies, incidents and history. Cluster mutations require an explicit cluster-action --apply."]
     return "\n".join(result)
 
 
@@ -802,6 +823,9 @@ def report_html(metadata, rows):
                        f"Cutoff basis: {escape(imported.get('duration_assignment', {}).get('rule', 'unknown'))}<br>"
                        f"Convergence: {escape(imported.get('convergence', 'unverified').replace('_', ' '))}</p>"
                        + '<pre>' + escape(json.dumps(imported.get('convergence_assessment', {}), indent=2)) + f'</pre><ul>{links}</ul>')
+        if row.get("executions"):
+            from .execution import summary
+            detail += "<h4>Cluster execution and transfers</h4><pre>" + escape(json.dumps([summary(r) for r in row["executions"]], indent=2, allow_nan=False)) + "</pre>"
         if row.get("preparation"):
             prep = row["preparation"]
             detail += ("<h4>Staged preparation</h4><pre>" + escape(json.dumps({
@@ -822,13 +846,14 @@ def report_html(metadata, rows):
                  f'<td class="numeric subtle">{escape(number(analysis.get("analysed_ns")))}</td>',
                  f'<td class="subtle">{escape(("Historical analysis imported" if analysis.get("state") == "historical_imported" else analysis.get("state", "unknown").replace("_", " ")))}</td>',
                  f'<td class="subtle">{escape(view["convergence"])}</td>',
+                 f'<td class="scheduler">{escape(view["scheduler_state"])}</td>',
                  f'<td class="job" title="{escape(view["job_id"])}">{escape(view["job_id"])}</td>',
                  f'<td class="location">{escape(view["location"])}</td>',
                  f'<td><span class="remark" style="--remark-color:{remark_color}"><i class="dot" aria-hidden="true"></i>{escape(view["remarks"])}</span></td>']
         search = " ".join([spec["dataset"], spec["ligand"], view["simulation_type"], view["leg"], str(view["repeat"]),
-                           view["stage_label"], view["remarks"], view["convergence"], view["job_id"], view["location"]] +
+                           view["stage_label"], view["remarks"], view["convergence"], view["scheduler_state"], view["job_id"], view["location"]] +
                           [f"{item['code']} {item['message']}" for item in row["incidents"]])
-        checked = [metadata.get("connections", {}).get(job["cluster"], {}).get("checked_at") or job.get("observed_at", "") for job in view["jobs"]]
+        checked = [job.get("observed_at") or metadata.get("connections", {}).get(job["cluster"], {}).get("checked_at", "") for job in view["jobs"]]
         job_checked = min(checked) if checked else ""
         body.append(f'<tr data-search="{escape(search.lower())}" data-job-checked="{escape(job_checked)}" data-remarks="{escape(view["remarks"])}"><td><details class="run"><summary aria-label="Inspect {escape(spec["id"])}">Inspect</summary><section>{detail}</section></details></td>' + ''.join(cells) + '</tr>')
     dataset_items = []
@@ -845,7 +870,7 @@ def report_html(metadata, rows):
         health.append(f'<span class="connection" data-state="{escape(state)}" data-checked="{escape(record.get("checked_at", ""))}" title="{escape(note)}"><span class="indicator" aria-hidden="true">{icon}</span><strong>{alias}</strong><span class="state">{escape(state)}</span></span>')
     legend = ''.join(f'<span class="legend-item"><i class="dot" style="--color:{color}" aria-hidden="true"></i>{escape(label)}</span>' for label, color in REMARK_COLORS.items())
     stage_legend = ''.join(f'<span class="legend-item"><i class="dot" style="--color:{color}" aria-hidden="true"></i>{escape(label)}</span>' for label, color in STAGES.values())
-    columns = ("Dataset", "Ligand", "Simulation type", "Leg", "Repeat", "Stage", "Prod ns", "Analysed ns", "Analysis", "Convergence", "Job ID", "Location", "Remarks")
+    columns = ("Dataset", "Ligand", "Simulation type", "Leg", "Repeat", "Stage", "Prod ns", "Analysed ns", "Analysis", "Convergence", "Scheduler", "Job ID", "Location", "Remarks")
     headers = '<th scope="col">Details</th>' + ''.join(
         f'<th scope="col" aria-sort="none"><button type="button" class="sort" data-column="{index}" '
         f'aria-label="Sort by {label}, ascending">{label}<span aria-hidden="true">↕</span></button></th>'
@@ -920,7 +945,7 @@ try{{const saved=JSON.parse(sessionStorage.getItem('hawtown-sort')||'null');if(s
 function ageConnections(){{
 document.querySelectorAll('[data-capacity-checked]').forEach(card=>{{const checked=Date.parse(card.dataset.capacityChecked);if(Number.isFinite(checked)&&Date.now()-checked>{CONNECTION_MAX_AGE_SECONDS * 1000})card.querySelector('.snapshot-state').textContent='stale snapshot';}});
 document.querySelectorAll('.connection').forEach(pill=>{{const checked=Date.parse(pill.dataset.checked);if(Number.isFinite(checked)&&Date.now()-checked>{CONNECTION_MAX_AGE_SECONDS * 1000}){{pill.dataset.state='stale';pill.querySelector('.indicator').textContent='◷';pill.querySelector('.state').textContent='stale';}}}});
-document.querySelectorAll('tr[data-job-checked]').forEach(row=>{{const checked=Date.parse(row.dataset.jobChecked);if(Number.isFinite(checked)&&Date.now()-checked>{CONNECTION_MAX_AGE_SECONDS * 1000}){{row.querySelector('.job').textContent='Unknown';row.querySelector('.location').textContent='Unknown';if(row.dataset.remarks!=='Attention required'){{row.querySelector('.remark').textContent='Unknown';}}if(row.querySelector('.stage').textContent==='Queued'){{row.querySelector('.stage').textContent='Queued (stale)';}}}}}});
+document.querySelectorAll('tr[data-job-checked]').forEach(row=>{{const checked=Date.parse(row.dataset.jobChecked);if(Number.isFinite(checked)&&Date.now()-checked>{CONNECTION_MAX_AGE_SECONDS * 1000}){{row.querySelector('.job').textContent='Unknown';row.querySelector('.scheduler').textContent='Unknown';row.querySelector('.location').textContent='Unknown';if(row.dataset.remarks!=='Attention required'){{row.querySelector('.remark').textContent='Unknown';}}if(row.querySelector('.stage').textContent==='Queued'){{row.querySelector('.stage').textContent='Queued (stale)';}}}}}});
 }}
 ageConnections();setInterval(ageConnections,60000);
 if(location.hostname==='127.0.0.1'&&location.port==='8765')setInterval(()=>{{if(!document.querySelector('details.run[open]')&&document.activeElement.tagName!=='INPUT')location.reload();}},300000);
@@ -948,6 +973,14 @@ def main(argv=None):
     preparation.add_argument("--output", required=True, type=Path)
     preparation.add_argument("--stage", required=True, choices=("vanilla", "alchemical"))
     preparation.add_argument("--plan", action="store_true", help="Validate mappings/inputs without generating anything")
+    cluster_plan = sub.add_parser("cluster-plan", help="Save an inspectable execution plan; no remote actions")
+    cluster_plan.add_argument("run_id")
+    cluster_plan.add_argument("--manifest", required=True, type=Path)
+    cluster_action = sub.add_parser("cluster-action", help="Inspect or explicitly apply an execution action")
+    cluster_action.add_argument("action_id")
+    cluster_action.add_argument("--operation", required=True, choices=("stage", "submit", "monitor", "retrieve"))
+    cluster_action.add_argument("--output", type=Path)
+    cluster_action.add_argument("--apply", action="store_true", help="Perform remote mutation/transfer; monitor is read-only")
     historical = sub.add_parser("import-analysis", help="Import historical result CSVs with their original provenance")
     historical.add_argument("run_id")
     historical.add_argument("--plan", action="store_true", help="Preview historical records without writing")
@@ -970,6 +1003,15 @@ def main(argv=None):
     try:
         if args.command == "init":
             print(f"Registered {initialize(args.registry, args.manifest, args.source_root)} runs; no source files changed.")
+        elif args.command == "cluster-plan":
+            from .execution import make_plan
+            print(json.dumps(make_plan(args.registry, args.run_id, args.manifest), indent=2, allow_nan=False))
+        elif args.command == "cluster-action":
+            from .execution import action
+            result = action(args.registry, args.action_id, args.operation, args.apply, args.output)
+            print(json.dumps(result, indent=2, allow_nan=False))
+            if result.get("state") in ("failed", "unknown", "paused"):
+                parser.exit(1, "Cluster action needs attention; inspect the evidence above.\n")
         elif args.command == "prepare":
             from .preparation import prepare
             result = prepare(args.registry, args.compound, args.manifest, args.output, args.stage, args.plan)

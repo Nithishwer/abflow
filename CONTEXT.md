@@ -241,7 +241,7 @@ One manifest maps three equilibration/vanilla repeats to their explicitly select
 topologies and corresponding complex legs. It records reviewer, reference,
 chemical state/charge, exact parameter files/versions, waters/ions, salt and temperature.
 Vanilla preparation reuses SimulationSetup with the membrane input directory and reviewed
-AMBER99SB-ILDN, Sage and Lipid21 inputs. Alchemical preparation checks the three
+`amber99sb-star-ildn-mut.ff`, Sage and Lipid21 inputs. Alchemical preparation checks the three
 100 ns vanilla endpoints, uses each trajectory/topology with MDRestraintsGenerator,
 and creates exactly three complex legs plus one compatible solvent leg. The old
 nested 3×3 loop is replaced by one complex leg per vanilla repeat; extra historical
@@ -251,9 +251,10 @@ state indices offset by 11; it no longer attempts missing restraint templates.
 Preparation supports the existing POPC helper file layout and current TIP3P/298.15 K
 MDP templates. Those are implementation limits, not new scientific requirements.
 Other reference inputs need explicit reconciliation. The manifest must supply reviewed
-Lipid21 files; the bundled lipid files are not reclassified as Lipid21. Standard
-`amber99sb-ildn.ff` is required explicitly; legacy star/mut inputs are blocked rather
-than substituted. The standalone solvent helper also requires an explicit reviewed
+Lipid21 files; the bundled lipid files are not reclassified as Lipid21. The required
+protein force field is `amber99sb-star-ildn-mut.ff`; normal `amber99sb-ildn.ff` inputs
+are blocked rather than substituted. This user correction on 16 October 2026 supersedes
+the earlier standard-ILDN requirement. The standalone solvent helper also requires an explicit reviewed
 force-field path. Restraint script/topology paths are explicit because the installed
 MDRestraintsGenerator lacks the legacy helper's expected sibling `scripts` directory.
 No environment or dependency was modified.
@@ -292,3 +293,92 @@ with status `retired`, separate from active incidents; other incident gates are 
 Labels move to `equilibration_labels`. Old stored specs and immutable analysis records
 remain untouched to preserve scientific identity; legacy observation fields/checks are
 omitted from the current view. The original database is backed up before migration.
+
+## Milestone 4 — minimal cluster adapters, 16 October 2026
+
+`abfe/execution.py` adds local execution plans and an append-only `execution_events`
+journal to the existing registry. `cluster-plan RUN_ID --manifest FILE` saves exact
+configuration, source/file hashes, declared campaign inputs, script identity and
+any linked analysis decision. Source identity must match the registered run, a hashed
+preparation receipt or a verified retrieval for that same run. `cluster-action ACTION_ID --operation
+stage|submit|monitor|retrieve` defaults to inspection; mutations/transfers require
+`--apply`. Monitor performs read-only SSH and records observations locally. Inspect
+shows execution and transfer summaries; detailed records remain in the journal.
+
+New job bundles use plain Slurm/GROMACS scripts; copying, checksum verification,
+submission and monitoring run on the workstation via rsync and SSH shell commands.
+There is no Python job runner or nvidia-smi gate. Historical worker-based execution
+bundles remain preserved. Module profiles use a Bash login shell; native checkpoints
+and small checksum/status files record stage progress. Routine Ranvier profiles use
+g-ran/gpu4-biggin A40 or gpuL40S-biggin L40S; Soma uses gpu3-A40 with biggingroup.
+Typed GPU requests and partition admission enforce the allowed allocation. Arrays need explicit concurrency. Short/conditional Khalid queues are
+unsupported in this minimal adapter, including g-kha even if an approval exists.
+Their addition requires a scoped implementation change, never automatic fallback.
+
+Vanilla uses the existing minimization/NVT/NPT/100 ns production sequence. Complex
+FEP windows run enmin/NVT/NPT_B/NPT_PR independently on GPUs. Solvent windows run
+independently through production with the supplied reference's coordinate processing.
+ARCHER compiles production TPRs with its selected executable from verified GPU NPT_PR
+coordinates/checkpoints, then runs only the 44-window HREX production command. The
+reference profile is 22 nodes, two MPI ranks per node, 64 threads per rank and at most
+24 hours. Exact binary/version and library environment are recorded; incompatible
+checkpoint reads fail rather than substituting software or rerunning equilibration.
+
+All managed ARCHER paths, executables and configured software directories remain under
+`/work/e280/e280-Biggin/reub0138`. Sources must be self-contained bundles with topology
+includes inside the source tree. Transfers use private per-action destinations,
+checksum manifests, non-overwriting resumable rsync and source/destination verification.
+Admission checks current partition/GPU eligibility, personal queue usage, ARCHER QoS
+submitted ceilings, scheduler test-only acceptance, filesystem/project quota and an
+explicit output storage reserve. Template storage/concurrency values are examples,
+not measured requirements or campaign limits. Slurm enforces running-job ceilings;
+eligible work may queue while capacity is busy. Remaining CU balance is not reported
+by this adapter; test-only admission does not establish a numerical allocation balance.
+
+Local and remote submission intent is durable before sbatch; uncertain submissions
+cannot be retried automatically. Monitor combines scheduler/accounting where available
+with hashed application/checkpoint evidence across every required array task. Queue
+absence alone remains unknown. Transport failure leaves unknown/stale evidence;
+workflow failures/conflicts create incidents and pause mutations. Explicit incident
+resolution remains separate from retry permission or repair. The existing registry,
+source runs and historical results are not migrated by these commands.
+
+Continuation requires managed stage receipts and matching input/checkpoint/software
+identity. Extension additionally requires a fresh managed analysis of the exact
+registered local source, tied to an immutable analysis ID. `convert-tpr -until` prepares
+all replacement production TPRs before installation, verifies their target, updates
+only MDP nsteps, and preserves previous TPRs/MDPs. The target remains analysed cutoff
++5 ns, capped at 50 ns. A failed preparation preserves partial evidence and blocks
+retry. A shared solvent array prepares extensions once under a lock before production.
+Reference: [GROMACS continuation guidance](https://manual.gromacs.org/2020.6/user-guide/managing-simulations.html).
+
+Retrieval verifies complete snapshots while jobs are stopped and stores them separately;
+it does not adopt them into canonical source paths, clear incidents, establish scientific
+convergence or change an analysis cutoff. Legacy restart adoption, agent orchestration
+and campaign rollout remain later work. Real executable paths/profile inputs and a
+separately authorized GPU/HREX/restart pilot remain necessary before production readiness.
+
+
+### Protein force-field correction — user decision, 16 October 2026
+
+The required protein force field everywhere is **`amber99sb-star-ildn-mut.ff`**. This
+supersedes the earlier requirement for normal AMBER99SB-ILDN. Preparation manifests
+use that exact directory name as `protocol.protein_forcefield.name`, and supply its
+reviewed path/version. The validator, solvent topology template and helper now agree
+with the existing vanilla/complex setup defaults. Parameter identity/hash checks remain;
+existing simulations, input topologies and immutable preparation/analysis receipts are
+not rewritten. Sage, Lipid21 and other scientific policies are unchanged. The obsolete
+Yuan mismatch incident raised solely because of the former requirement is retired
+with its original message retained, not treated as scientific validation or job approval.
+
+
+### Submission checkpoint — 17 October 2026
+
+The native Yuan DOR_10 vanilla pilot was submitted by the user as Ranvier job 128322
+and observed doing NPT on one GPU. Complete sampling, controlled restart and actual
+GPU-to-ARCHER handoff remain unverified. The console now matches managed execution
+directories against fresh periodic queue snapshots and displays Scheduler separately
+from simulation stage/convergence. 56 console/monitor tests and 24 final native
+execution tests passed; end-to-end automatic console updating still needs user
+verification. The user requested the exact checkpoint commit message
+`feat: submit to cluster works but console wont update`.

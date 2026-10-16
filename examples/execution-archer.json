@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "deflorian-set1/OX2_48845/complex/3",
+  "source": "/absolute/verified-gpu-retrieval/data",
+  "relative_run": "complex",
+  "workload": "complex-production",
+  "mode": "initial",
+  "cluster": "archer",
+  "partition": "standard",
+  "account": "e280-biggin",
+  "qos": "standard",
+  "walltime_hours": 24,
+  "output_reserve_bytes": 107374182400,
+  "modules": [],
+  "gromacs": "/work/e280/e280-Biggin/reub0138/REPLACE_WITH_VERIFIED_GROMACS/bin/gmx_mpi",
+  "gromacs_version": "2020.6-plumed-2.8.2",
+  "path_dirs": ["/work/e280/e280-Biggin/reub0138/REPLACE_WITH_VERIFIED_PLUMED/bin"],
+  "library_dirs": ["/work/e280/e280-Biggin/reub0138/REPLACE_WITH_VERIFIED_PLUMED/lib"]
+}

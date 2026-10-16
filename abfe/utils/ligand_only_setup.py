@@ -61,6 +61,8 @@ class LigandOnlySetup:
         os.chdir(self.lig_dir)
 
     def _copy_files(self):
+        if self.forcefield_path is None or self.forcefield_path.name != "amber99sb-star-ildn-mut.ff":
+            raise ValueError("Supply a reviewed forcefield_path for amber99sb-star-ildn-mut.ff")
 
         lig_suffix = self.ligand_name.split("_")[-1]
         base = self.vanilla_path
@@ -83,8 +85,6 @@ class LigandOnlySetup:
                 raise FileNotFoundError(f"Required file not found: {src}")
             shutil.copyfile(src, dst)
 
-        if self.forcefield_path is None:
-            raise ValueError("Supply a reviewed forcefield_path; the legacy bundled force field conflicts with lig.top")
         ff_src = self.forcefield_path
         shutil.copytree(ff_src, self.lig_dir / ff_src.name)
 

@@ -22,6 +22,7 @@ from .analysis import incident, settings
 from .campaign import check_destination, encode, now, read_registry
 
 STAGES = ("enmin", "nvt", "npt_b", "npt_pr", "prod")
+PROTEIN_FORCEFIELD = "amber99sb-star-ildn-mut.ff"
 COMPLEX_WINDOWS = {"rest": 12, "coul": 11, "vdw": 21}
 SOLVENT_WINDOWS = {"coul": 11, "vdw": 21}
 LIPID_FILES = ("forcefield_popc.itp", "POPC.itp", "popc_posres.itp")
@@ -146,7 +147,7 @@ def load_plan(registry, compound, manifest, output, stage):
     ):
         nonempty(protocol[key], key)
     for key, expected in (
-        ("protein_forcefield", "AMBER99SB-ILDN"),
+        ("protein_forcefield", PROTEIN_FORCEFIELD),
         ("ligand_forcefield", "Sage"),
         ("lipid_forcefield", "Lipid21"),
     ):
@@ -155,9 +156,9 @@ def load_plan(registry, compound, manifest, output, stage):
         nonempty(protocol[key]["version"], f"{key} version")
         sources.append(absolute(protocol[key]["path"]))
     ff = absolute(protocol["protein_forcefield"]["path"])
-    if ff.name != "amber99sb-ildn.ff" or not (ff / "forcefield.itp").is_file():
+    if ff.name != PROTEIN_FORCEFIELD or not (ff / "forcefield.itp").is_file():
         raise ValueError(
-            "Supply reviewed standard amber99sb-ildn.ff; the legacy star/mut force field cannot be substituted"
+            f"Supply reviewed {PROTEIN_FORCEFIELD}; other protein force fields cannot be substituted"
         )
     for name in ("tip3p.itp", "ions.itp"):
         if not (ff / name).is_file():
@@ -213,7 +214,7 @@ def load_plan(registry, compound, manifest, output, stage):
         absolute(inputs["solvent_topology"]),
     ):
         text = topology.read_text()
-        if "amber99sb-star" in text or "amber99sb-ildn.ff/forcefield.itp" not in text:
+        if "amber99sb-ildn.ff/" in text or f"{PROTEIN_FORCEFIELD}/forcefield.itp" not in text:
             raise ValueError(f"Protein force-field mismatch in {topology}")
     vanilla = {r: absolute(repeats[str(r)]["vanilla"]) for r in (1, 2, 3)}
     topologies = {r: absolute(repeats[str(r)]["topology"]) for r in (1, 2, 3)}
@@ -234,7 +235,7 @@ def load_plan(registry, compound, manifest, output, stage):
                     raise ValueError(f"Missing vanilla restraint input: {path / name}")
             validate_mdp(path / "prod.mdp", 100000, temperature)
             top = topologies[r].read_text()
-            if "amber99sb-star" in top or "amber99sb-ildn.ff/forcefield.itp" not in top:
+            if "amber99sb-ildn.ff/" in top or f"{PROTEIN_FORCEFIELD}/forcefield.itp" not in top:
                 raise ValueError(f"Vanilla protein force-field mismatch: {path}")
             if snapshot(path / ff.name)["files"] != snapshot(ff)["files"]:
                 raise ValueError(
@@ -391,7 +392,7 @@ def validate_outputs(plan):
     validate_windows(Path(plan["solvent"]), SOLVENT_WINDOWS, temp)
 
 
-def validate_windows(root, windows, temperature):
+def validate_windows(root, windows, temperature, duration_ps=20000):
     actual = {
         p.name
         for p in root.iterdir()
@@ -426,7 +427,7 @@ def validate_windows(root, windows, temperature):
                 if vectors != reference:
                     raise ValueError(f"Inconsistent lambda maps in {path}")
                 if stage == "prod":
-                    validate_mdp(path, 20000, temperature)
+                    validate_mdp(path, duration_ps, temperature)
             state += 1
 
 

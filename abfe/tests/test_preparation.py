@@ -29,7 +29,7 @@ class PreparationTests(unittest.TestCase):
         self.output = self.root / 'staged'
         inputs = self.root / 'inputs'
         inputs.mkdir()
-        self.ff = inputs / 'amber99sb-ildn.ff'
+        self.ff = inputs / 'amber99sb-star-ildn-mut.ff'
         self.ff.mkdir()
         for name in ('forcefield.itp', 'tip3p.itp', 'ions.itp'):
             (self.ff / name).write_text('; reviewed synthetic fixture\n')
@@ -39,7 +39,7 @@ class PreparationTests(unittest.TestCase):
             (self.lipid / name).write_text('; synthetic lipid fixture\n')
         self.protein = inputs / 'protein'
         self.protein.mkdir()
-        topology = '#include "amber99sb-ildn.ff/forcefield.itp"\n'
+        topology = '#include "amber99sb-star-ildn-mut.ff/forcefield.itp"\n'
         (self.protein / 'topol.top').write_text(topology)
         (self.protein / 'protein.gro').write_text('synthetic protein coordinates')
         for name in ('L1.sdf', 'sage.offxml', 'waters.gro', 'waterbox.gro'):
@@ -60,7 +60,7 @@ class PreparationTests(unittest.TestCase):
                                          chemical_state='test molecule', waters_and_ions='test reference',
                                          charge_treatment='ABFlow co-annihilation', expected_charge=0,
                                          water_model='TIP3P', salt_molar=0.15, temperature_K=298.15,
-                                         protein_forcefield=dict(name='AMBER99SB-ILDN', version='fixture', path=str(self.ff)),
+                                         protein_forcefield=dict(name='amber99sb-star-ildn-mut.ff', version='fixture', path=str(self.ff)),
                                          ligand_forcefield=dict(name='Sage', version='fixture', path=str(inputs / 'sage.offxml')),
                                          lipid_forcefield=dict(name='Lipid21', version='fixture', path=str(self.lipid))),
                            inputs=dict(sdf=str(inputs / 'L1.sdf'), protein=str(self.protein), charmm_folder=str(charmm),
@@ -95,6 +95,7 @@ class PreparationTests(unittest.TestCase):
     def test_plan_has_exact_mapping_and_writes_nothing(self):
         before = self.registry.read_bytes()
         plan = self.plan()
+        self.assertEqual(plan['config']['protocol']['protein_forcefield']['name'], 'amber99sb-star-ildn-mut.ff')
         self.assertEqual(len(plan['mappings']), 3)
         self.assertEqual(plan['mappings'][2]['complex'], str(self.output / 'L1/abfe_van3_hrex_r1/complex'))
         self.assertEqual(plan['solvent'], str(self.output / 'L1/abfe_van1_hrex_r1/ligand'))
@@ -145,10 +146,53 @@ class PreparationTests(unittest.TestCase):
 
 
     def test_rejects_protocol_mismatch_before_generation(self):
-        (self.protein / 'topol.top').write_text('#include "amber99sb-star-ildn-mut.ff/forcefield.itp"')
+        (self.protein / 'topol.top').write_text('#include "amber99sb-ildn.ff/forcefield.itp"')
         with self.assertRaisesRegex(ValueError, 'mismatch'):
             self.plan()
         self.assertFalse(self.output.exists())
+
+    def test_rejects_normal_ildn_manifest_name_and_directory(self):
+        self.config['protocol']['protein_forcefield']['name'] = 'AMBER99SB-ILDN'
+        self.write_config()
+        with self.assertRaisesRegex(ValueError, 'Expected protein_forcefield: amber99sb-star-ildn-mut.ff'):
+            self.plan()
+        self.config['protocol']['protein_forcefield']['name'] = 'amber99sb-star-ildn-mut.ff'
+        self.config['protocol']['protein_forcefield']['path'] = str(self.ff.parent / 'amber99sb-ildn.ff')
+        self.write_config()
+        with self.assertRaisesRegex(ValueError, 'Supply reviewed amber99sb-star-ildn-mut.ff'):
+            self.plan()
+
+    def test_alchemical_repeat_rejects_normal_ildn_topology(self):
+        self.make_alchemical_inputs()
+        topology = Path(self.config['repeats']['2']['topology'])
+        topology.write_text('#include "amber99sb-ildn.ff/forcefield.itp"\n')
+        with self.assertRaisesRegex(ValueError, 'Vanilla protein force-field mismatch'):
+            prep.prepare(self.registry, 'test/L1', self.manifest, self.output, 'alchemical', True)
+
+    def test_solvent_default_template_copies_the_required_forcefield(self):
+        from abfe.utils.ligand_only_setup import LigandOnlySetup
+        from abfe.utils.utils import working_directory
+        self.make_alchemical_inputs()
+        helper = LigandOnlySetup('L1', self.root / 'solvent-test',
+                                 vanilla_path=self.config['repeats']['1']['vanilla'],
+                                 forcefield_path=self.ff, write_job_scripts=False)
+        with working_directory(self.root):
+            helper._make_dirs()
+            helper._copy_files()
+            helper._replace_lig_name()
+        text = (helper.lig_dir / 'lig.top').read_text()
+        for name in ('forcefield.itp', 'tip3p.itp', 'ions.itp'):
+            self.assertIn('amber99sb-star-ildn-mut.ff/' + name, text)
+        self.assertNotIn('amber99sb-ildn.ff/', text)
+        self.assertEqual(prep.snapshot(helper.lig_dir / self.ff.name)['files'], prep.snapshot(self.ff)['files'])
+
+    def test_solvent_helper_rejects_other_forcefield_directory(self):
+        from abfe.utils.ligand_only_setup import LigandOnlySetup
+        helper = LigandOnlySetup('L1', self.root / 'solvent-test',
+                                 forcefield_path=self.ff.parent / 'amber99sb-ildn.ff')
+        with self.assertRaisesRegex(ValueError, 'amber99sb-star-ildn-mut.ff'):
+            helper._copy_files()
+        self.assertFalse(helper.lig_dir.exists())
 
     def test_rejects_relative_and_overlapping_destinations(self):
         with self.assertRaisesRegex(ValueError, 'absolute'):
