@@ -1,0 +1,236 @@
+{
+  "schema_version": 1,
+  "name": "Membrane protein ABFE campaign",
+  "source_root": "/path/to/orexin",
+  "datasets": [
+    {
+      "id": "deflorian-set1",
+      "label": "Deflorian OX2 set 1",
+      "expected_ligands": 27,
+      "ligands": [
+        "OX2_42922",
+        "OX2_43289",
+        "OX2_43367",
+        "OX2_43612",
+        "OX2_43703",
+        "OX2_43796",
+        "OX2_43929",
+        "OX2_46433",
+        "OX2_46726",
+        "OX2_46831",
+        "OX2_46853",
+        "OX2_46892",
+        "OX2_46905",
+        "OX2_47311",
+        "OX2_47594",
+        "OX2_47816",
+        "OX2_47821",
+        "OX2_47848",
+        "OX2_48083",
+        "OX2_48732",
+        "OX2_48845",
+        "OX2_48951",
+        "OX2_49599",
+        "OX2_49847",
+        "OX2_49860",
+        "OX2_51964",
+        "OX2_52542"
+      ],
+      "directory": "deflorian_set_1_j13_v2_na",
+      "input_directory": "kumar_D3_v2_na/system_setup/input_files/OX2_set1",
+      "ligand_prefix": "OX2_",
+      "complex_windows": {
+        "rest": 12,
+        "coul": 11,
+        "vdw": 21
+      },
+      "solvent_windows": {
+        "coul": 11,
+        "vdw": 21
+      }
+    },
+    {
+      "id": "piersanti",
+      "label": "Piersanti A2A",
+      "expected_ligands": 7,
+      "ligands": [
+        "A2A_14",
+        "A2A_15",
+        "A2A_16b",
+        "A2A_16c",
+        "A2A_17",
+        "A2A_18",
+        "A2A_25b"
+      ],
+      "directory": "piersanti_A2A_v2_na",
+      "input_directory": "kumar_D3_v2_na/system_setup/input_files/A2A_2013",
+      "ligand_prefix": "A2A_",
+      "complex_windows": {
+        "rest": 12,
+        "coul": 11,
+        "vdw": 21
+      },
+      "solvent_windows": {
+        "coul": 11,
+        "vdw": 21
+      }
+    },
+    {
+      "id": "yuan",
+      "label": "Yuan DOR",
+      "expected_ligands": 11,
+      "ligands": [
+        {
+          "id": "DOR_10",
+          "directory": "yuan_DOR_c1_v1_w_na/DOR_10",
+          "inputs": [
+            "kumar_D3_v2_na/system_setup/input_files/DOR/Cycle1/10.sdf"
+          ]
+        },
+        {
+          "id": "DOR_11",
+          "directory": "yuan_DOR_c1_v1_w_na/DOR_11",
+          "inputs": [
+            "kumar_D3_v2_na/system_setup/input_files/DOR/Cycle1/11.sdf"
+          ]
+        },
+        {
+          "id": "DOR_12",
+          "directory": "yuan_DOR_c1_v1_w_na/DOR_12",
+          "inputs": [
+            "kumar_D3_v2_na/system_setup/input_files/DOR/Cycle1/12.sdf"
+          ]
+        },
+        {
+          "id": "DOR_13",
+          "directory": "yuan_DOR_c1_v1_w_na/DOR_13",
+          "inputs": [
+            "kumar_D3_v2_na/system_setup/input_files/DOR/Cycle1/13.sdf"
+          ]
+        },
+        {
+          "id": "DOR_14",
+          "directory": "yuan_DOR_c2_v1_w_na/DOR_14",
+          "inputs": [
+            "kumar_D3_v2_na/system_setup/input_files/DOR/Cycle2/14.sdf"
+          ]
+        },
+        {
+          "id": "DOR_15",
+          "directory": "yuan_DOR_c2_v1_w_na/DOR_15",
+          "inputs": [
+            "kumar_D3_v2_na/system_setup/input_files/DOR/Cycle2/15.sdf"
+          ]
+        },
+        {
+          "id": "DOR_16",
+          "directory": "yuan_DOR_c2_v1_w_na/DOR_16",
+          "inputs": [
+            "kumar_D3_v2_na/system_setup/input_files/DOR/Cycle2/16.sdf"
+          ]
+        },
+        {
+          "id": "DOR_17",
+          "directory": "yuan_DOR_c2_v1_w_na/DOR_17",
+          "inputs": [
+            "kumar_D3_v2_na/system_setup/input_files/DOR/Cycle2/17.sdf"
+          ]
+        },
+        {
+          "id": "DOR_18",
+          "directory": "yuan_DOR_c1_v1_w_na/DOR_18",
+          "inputs": [
+            "kumar_D3_v2_na/system_setup/input_files/DOR/Cycle1/18.sdf"
+          ]
+        },
+        {
+          "id": "DOR_19",
+          "directory": "yuan_DOR_c1_v1_w_na/DOR_19",
+          "inputs": [
+            "kumar_D3_v2_na/system_setup/input_files/DOR/Cycle1/19.sdf"
+          ]
+        },
+        {
+          "id": "DOR_20",
+          "directory": "yuan_DOR_c1_v1_w_na/DOR_20",
+          "inputs": [
+            "kumar_D3_v2_na/system_setup/input_files/DOR/Cycle1/20.sdf"
+          ]
+        }
+      ],
+      "directory": null,
+      "input_directory": null,
+      "ligand_prefix": "DOR_",
+      "complex_windows": {
+        "rest": 12,
+        "coul": 11,
+        "vdw": 21
+      },
+      "solvent_windows": {
+        "coul": 11,
+        "vdw": 21
+      }
+    },
+    {
+      "id": "heffernan",
+      "label": "Heffernan TA1 agonist",
+      "expected_ligands": 8,
+      "ligands": [
+        "1",
+        "19",
+        "21",
+        "22",
+        "23",
+        "24",
+        "25",
+        "29"
+      ],
+      "directory": null,
+      "input_directory": "kumar_D3_v2_na/system_setup/input_files/TA1/Activate",
+      "ligand_prefix": "",
+      "complex_windows": {
+        "rest": 12,
+        "coul": 11,
+        "vdw": 21
+      },
+      "solvent_windows": {
+        "coul": 11,
+        "vdw": 21
+      }
+    },
+    {
+      "id": "thoma",
+      "label": "Thoma CXCR4",
+      "expected_ligands": 9,
+      "ligands": [
+        "1a",
+        "1b",
+        "1c",
+        "1d",
+        "1g",
+        "1h",
+        "1i",
+        "1j",
+        "1t"
+      ],
+      "directory": null,
+      "input_directory": "kumar_D3_v2_na/system_setup/input_files/CXCR4",
+      "ligand_prefix": "",
+      "complex_windows": {
+        "rest": 12,
+        "coul": 11,
+        "vdw": 21
+      },
+      "solvent_windows": {
+        "coul": 11,
+        "vdw": 21
+      }
+    },
+    {
+      "id": "sigma2",
+      "label": "Sigma 2 (not started)",
+      "expected_ligands": null,
+      "ligands": []
+    }
+  ]
+}

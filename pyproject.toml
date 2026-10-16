@@ -5,6 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "abflow"
 version = "0.1.0"
+requires-python = ">=3.10"
 description = "Automated free energy simulation workflows for ligand binding"
 authors = [
     { name = "Antonia Panescu", email = "antonia.panescu@outlook.com" }
@@ -16,6 +17,9 @@ dependencies = [
     "scipy"
 ]
 
+[project.scripts]
+abflow-campaign = "abfe.campaign:main"
+
 [tool.setuptools]
 include-package-data = true
 
@@ -24,6 +28,7 @@ where = ["."]
 include = ["abfe*"]
 
 [tool.setuptools.package-data]
+"abfe" = ["console_assets/*.css", "console_assets/*.ttf", "console_assets/*LICENSE.txt"]
 "abfe.utils" = ["water_deletor.pl"]
 
 # Include all .sh files in all subfolders of job_script_template

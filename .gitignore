@@ -1,2 +1,7 @@
 # Ignore test data
 abfe/tests/test_data/
+
+# Local campaign state and Python test artifacts
+.abflow/
+__pycache__/
+.pytest_cache/
