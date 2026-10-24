@@ -4,7 +4,16 @@ abfe/tests/test_data/
 # Local campaign state and Python test artifacts
 .abflow/
 __pycache__/
+*.py[cod]
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.venv/
 
 # Generated packaging output
 *.egg-info/
