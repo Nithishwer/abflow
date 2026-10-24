@@ -1,4 +1,0 @@
-MDAnalysis
-openff-toolkit
-numpy
-scipy

@@ -1,8 +1,8 @@
 import shutil
-from pathlib import Path
+
 import pytest
 
-from abfe.setup_vanilla_simulations import SimulationSetup
+import abfe.preparation.vanilla as preparation_vanilla
 from abfe.tests import datafiles
 
 
@@ -23,7 +23,7 @@ def test_run_vanilla_setup_outputs_correct_files(tmp_path):
     shutil.copytree(datafiles.SDF_DIR.resolve(), sdf_folder)
     shutil.copy(datafiles.CRYSTAL_WATER.resolve(), crystal_water)
 
-    setup = SimulationSetup(
+    setup = preparation_vanilla.SimulationSetup(
         base_path=base_path,
         charmm_folder=charmm_folder,
         protein_folder=protein_folder,
@@ -31,7 +31,7 @@ def test_run_vanilla_setup_outputs_correct_files(tmp_path):
         crystal_water_gro=crystal_water,
         solvate_water_count=10286,
         crystal_water_count=136,
-        num_nodes=2
+        num_nodes=2,
     )
 
     setup.setup_all(repeats=1)

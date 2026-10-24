@@ -1,223 +1,181 @@
-# ABFE_Package
-Code for setting up and running replica ABFE simulations
-Got it — here’s a clean README section with just your **install from source** steps:
+# ABFlow
 
----
+Deterministic membrane-protein ABFE preparation, execution and analysis, with a
+local status console and an agent operating explicitly approved batches.
+Current scientific and cluster policies are linked from [CONTEXT.md](CONTEXT.md).
 
-## Install from Source
+## Installation
 
-1. **Clone the repository**
-
-```bash
-git clone --recurse-submodules https://github.com/Nithishwer/abflow.git
-cd abflow
-```
-
-2. **Create and activate the conda environment**
+Use the existing `abflow_v2` environment, or reproduce it with
+`conda env create -f abfe_environment.yml`. From a checkout with its submodule:
 
 ```bash
-conda env create -f abfe_environment.yml
 conda activate abflow_v2
-```
-
-3. **Install `MDRestraintsGenerator`**
-
-```bash
 git submodule update --init --recursive
 pip install --no-deps ./src/MDRestraintsGenerator
+pip install --no-deps .
 ```
 
-4. **Install this repository**
+Preparation requires the reviewed GROMACS/parameter/restraint inputs. Cluster jobs
+run plain Slurm/GROMACS scripts; analysis runs locally in `abflow_v2`.
+
+## Campaign workflow
+
+The default registry is the existing campaign database at
+`/biggin/b211/reub0138/Documents/ChatGPT/Membrane-protein-FEP/.abflow/campaign.sqlite`.
+Use `--registry /absolute/campaign.sqlite` to operate another campaign. A missing
+registry is an error; operating commands never initialize a replacement.
 
 ```bash
-pip install .
+abflow refresh --remote
+abflow next-step --dry-run
+abflow next-step
 ```
 
-## HPC-specific dependencies
+`next-step --dry-run` and `next-step` use the same selection code and the latest
+recorded refresh. The dry run only prints action types/counts and the numbers of
+ready, complete, waiting and blocked runs. It does not update SQLite, register
+incidents, publish reports, create a plan or script on disk, or execute an action.
+It does not run refresh; use `refresh --remote` to update campaign observations.
+Recorded scheduler observations do not expire with age. The CLI and console use
+the latest recorded evidence until refreshed; missing or failed checks still block.
+Both modes retain read-only checks of the relevant source files and receipts;
+selecting a download also inspects the remote outputs without transferring them.
 
-In addition to the Python environment (`abfe_environment.yml`), this workflow requires the following modules to be loaded on the HPC environment before running:
+Plain `next-step` registers the selected batch and executes one immediate operation
+per ready run. It does not advance a run through multiple phases in one invocation.
+Shared preparations and solvents appear once. Execution rechecks the saved evidence
+and current jobs before each mutation, records intent/outcome and publishes the
+console. A later invocation selects again: a preview does not reserve its inputs or
+freeze future execution. Changed or unavailable evidence blocks affected work.
+
+The next-step operation names are `prepare-input`, `plan-submission`,
+`upload-jobs`, `submit-jobs`, `download-jobs`, `analyse-dhdl`,
+and `calculate-affinity`. These names apply to previews and named saved-operation
+commands. Analysis and affinity calculations run through `next-step`; preparation
+also has a standalone `prepare` command.
+
+`download-jobs` downloads and verifies outputs, then automatically registers the
+downloaded directory as the run's current source. It completes only after both
+steps succeed. Interrupted operations remain blocked for explicit review;
+changed files or mapping failures also pause affected work.
+Older verified downloads awaiting registration use the same operation without
+repeating the transfer. Analysis uses the registered source and records its own
+results; it does not change source paths afterward.
+
+Production selection reads DHDL tails and small MDP files, checks the exact common
+cutoff and records file metadata in memory. Actual analysis retains full input/header
+validation and SHA256 provenance. Execution/transfer snapshots retain content checks.
+Converged validated simulations are left alone; compatible binding compilation can
+still be selected. An analysis proposing extension does not execute that extension
+in the same round. Review the next preview before invoking `next-step` again.
+
+Existing results can be adopted once using the user-approved timestamp rule:
+both `ABFE_summary.csv` and `ABFE_convergence.csv` must be strictly newer than
+every required production DHDL. Tables, required windows, exact cutoff and native
+inputs are checked. Shared processing settings and script identity come from a
+named validated reference analysis, with explicit user confirmation that the same
+scripts/settings were used. The receipt records this acceptance basis, the run's
+own input/output hashes and duration, and copies of its result CSVs. Original
+historical records remain immutable. This accepts timestamp freshness; it does
+not reconstruct the original execution environment or detect changes that preserve
+timestamps before adoption. Missing, equal/older or invalid results are not adopted.
+
+Historical import and verification remain internal Python operations; there is no
+standalone analysis command. Adoption adds no next-step operation and never runs
+an estimator. The resulting receipt uses the existing freshness, convergence,
+decision and binding-compatibility checks. Original CSVs
+and unrelated incidents are preserved; verification does not resolve incidents,
+resume interrupted work, submit jobs or establish solvent compatibility. Future
+changes to source or result files invalidate the receipt. Current valid receipts
+are reused and repeated verification does not create duplicate records.
+
+Failed actions do not prevent independent selected actions from running. The command
+exits nonzero when actions fail or work remains blocked. Recorded successful
+actions are not repeated. Interrupted attempts remain blocked for explicit review;
+no automatic reconciliation is performed. Named saved-operation commands
+remain available internally and in the console. Historical scopes, scripts and
+receipts are preserved; code changes invalidate earlier frozen commands.
+Incident repairs/resumption still require explicit incident authorization. No polling,
+scheduling, scientific-setting changes or unbounded extensions are enabled.
+
+Readiness uses reviewed execution/preparation records and resource ceilings
+already stored for the run. Agents may record additional reviewed preparation,
+execution-profile or binding-compatibility inputs in registry metadata
+`next_step_inputs`; this is internal configuration, not a required user-authored
+file. Missing profiles, incomplete preparation inputs, incompatible source layouts
+or partial compound preparations remain blocked. Existing native execution and
+analysis receipts keep their established formats.
+
+Ask the agent to review the whole campaign. It inspects registered runs and known
+local/cluster locations, reports coverage and blockers, and saves one concrete
+proposal with a per-run appendix. Approve all or selected groups in chat; the agent
+manages manifests, IDs and commands, executes that exact batch, and reports outcomes.
+New incidents pause affected work before correction. Repair/resumption needs explicit
+incident authority. Approval never enables unspecified work or recurring execution.
+
+View campaign status in `.abflow/campaign.html`; reload the page after publication.
+
+## Commands
+
+The optional `--registry /absolute/campaign.sqlite` goes before the command verb.
+The registry and reports must be outside simulation/input directories.
+
+| Verb | Purpose |
+|---|---|
+| `init --manifest FILE [--source-root DIR]` | Register a new campaign from YAML |
+| `refresh [--remote] [--publish-dir DIR]` | Scan local evidence and publish; optionally inspect own queues and active/uncertain jobs |
+| `next-step --dry-run` | Show action types/counts using the same selection as execution; save and execute nothing |
+| `next-step` | Select, register and execute one immediate action per ready run |
+| `next-step OPERATION --plan-id ID --run-id RUN` | Execute one exact saved operation; internal/advanced interface |
+| `prepare COMPOUND --manifest FILE --stage vanilla\|alchemical --output DIR [--plan]` | Protected local preparation |
+
+Preparation and analysis write only their stated local outputs. Incident holds and
+explicit repair/resumption requirements remain enforced internally.
+
+`refresh` publishes `campaign.html` and `preview.html`
+beside the registry unless `--publish-dir` is supplied. Remote refresh only inspects
+jobs; it does not submit, retrieve, resume or repair them. Unavailable evidence stays
+unknown and incomplete refresh exits nonzero. No periodic telemetry is provided.
+
+## Formats and tests
+
+Campaign manifests use YAML; see [the campaign example](examples/membrane-campaign.yaml).
+For a new campaign, run `abflow --registry /absolute/new-campaign.sqlite init --manifest campaign.yaml`.
+Use strings for ligand IDs and repeat-map keys (for example, `'19'` and `'1'`).
+Existing JSON campaign manifests remain readable as a subset of YAML. Preparation,
+GPU/ARCHER execution and batch-scope manifests retain their versioned JSON formats.
+SQLite stores state/history; CSV stores scientific results; TSV
+supports review appendices. Generated job scripts retain native checkpoints and
+checksum receipts. Simulation, scheduler, transfer, analysis freshness and convergence
+remain separate evidence.
 
 ```bash
-module load GROMACS/2023
+ABFLOW_SCIENTIFIC_TEST=1 python -m unittest discover -s abfe/tests -t .
 ```
 
-MDRestraintsGenerator is pinned by the Git submodule. Install it with `--no-deps` to retain the environment's SciPy version. For an editable installation, run this from the ABFlow repository root:
+The scientific integration test uses synthetic data. Real-compound preparation and
+GPU-to-ARCHER handoff acceptance remain outstanding. No environment replacement,
+production rollout or automatic incident repair is implied by installation.
 
-```bash
-git submodule update --init --recursive
-pip install --no-deps -e ./src/MDRestraintsGenerator
-```
+## Source layout
 
-## Usage
+Each folder groups one area. Each module handles one operation or a small group of
+closely related functions. Tests follow the same folders under `abfe/tests/`.
 
-The `SimulationSetup` class prepares full membrane-protein-ligand systems for ABFE simulations (one folder per ligand and replicate). This includes merging protein, membrane, ligand, and crystal waters, solvating the box, and generating GROMACS input files.
+| Folder | Contents |
+|---|---|
+| `commands/` | Arguments, dispatch and status output |
+| `registry/` | Campaign manifests, SQLite reads and shared record values |
+| `monitoring/` | Scheduler queries, local inspection and evidence refresh |
+| `console/` | Status presentation, datasets, run details and report publication |
+| `analysis/` | Inputs, estimation, convergence, provenance, history and binding |
+| `preparation/` | Plan validation, parameterization, topology, windows and preparation stages |
+| `execution/` | Plans, journal, staging, submission, monitoring and retrieval |
+| `execution/jobs/` | Stage, HREX and extension script generation |
+| `execution/transport/` | SSH, file checks, queues, admission limits and remote dispatch |
+| `operator/` | Approval checks, batch selection, steps, journals and incidents |
+| `console_assets/`, `utils/data/`, `utils/cluster/` | Packaged styles/scripts and native scientific/job resources |
 
-### Example: Running ABFE Setup for All Ligands
-
-```python
-from abfe.setup_vanilla_simulations import SimulationSetup
-
-# Define your paths (replace with your actual directories)
-base_path = "/ABS/PATH/TO/WORKDIR"  # e.g. /home/user/abfe_project
-charmm_folder = "/ABS/PATH/TO/CHARMM_GMX"  # contains step5_input.pdb and membrane files
-protein_folder = "/ABS/PATH/TO/PROTEIN_PARAM"  # contains topol.top, forcefield.itp, posres.itp, etc.
-sdf_folder = "/ABS/PATH/TO/LIGAND_SDFS"  # contains *.sdf files, pre-aligned to protein binding site
-crystal_water_gro = "/ABS/PATH/TO/CRYSTAL_WATERS.gro"  # aligned and parameterized crystal waters
-
-# Optional settings
-solvate_water_count = 10286
-crystal_water_count = 136
-num_nodes = 2
-
-# Instantiate the setup class
-setup = SimulationSetup(
-    base_path,
-    charmm_folder,
-    protein_folder,
-    sdf_folder,
-    crystal_water_gro,
-    solvate_water_count,
-    crystal_water_count,
-    num_nodes
-)
-
-# prepare every ligand in the SDF folder
-setup.setup_all()
-
-# or, for a single ligand, single run:
-# setup.setup_simulation("cmp_123")
-
-# all ligands, 5 repeats
-# setup.setup_all(repeats=5)
-
-# single ligand, custom repeats (three replicas for only cmp_42
-# for replica in range(1, 4):
-#    setup.setup_simulation("cmp_42", replicate=replica)
-```
-
-## ABFE Setup
-
-Use `abflow_v2` and fill in `examples/preparation.json` with one registered compound's
-three equilibration repeats, a CHARMM-GUI membrane input directory, reviewed
-parameters and explicit water/ion settings.
-
-```bash
-python -m abfe.campaign --registry /absolute/campaign.sqlite prepare DATASET/LIGAND \
-  --manifest /absolute/preparation.json --stage vanilla --output /absolute/staging/vanilla --plan
-```
-
-Omit `--plan` to generate staged inputs. After the three vanilla trajectories reach
-100 ns, use `--stage alchemical --output /absolute/staging/alchemical` with the same
-manifest. This generates three complex legs and one shared solvent leg, without
-submitting jobs or adopting existing runs. Identical reruns verify/reuse outputs;
-failures preserve staging and create incidents. Inspect shows preparation status.
-
-## ABFE Analysis
-
-The `ABFEAnalyzer` class performs automated analysis of complex-leg and ligand-only ABFE simulations.
-
-- Computes ΔG for complex and ligand legs across multiple replicates  
-- Ensures ligand-only analysis is done **once per system**  
-- Symlinks ligand results across replicates for consistency  
-- Compiles final ΔG results for each ligand
-
-> **Only edit the `base_path` and `ligand_folders` list — everything else works out of the box.**
-
-### Example: Analyzing ABFE Results Across Ligands
-
-```python
-from abfe.analyse_abfe import ABFEAnalyzer
-
-# --- 🔧 Define your system path and ligands ---
-base_path = "/ABS/PATH/TO/WORKDIR"  # Folder containing all ligand folders
-ligand_folders = ["Ligand1", "Ligand2"]  # Replace with your actual ligand folder names
-n_replicates = 3  # Number of ABFE replicates per ligand
-
-# --- Run analysis for each ligand ---
-for ligand in ligand_folders:
-    ligand_path = f"{base_path}/{ligand}"
-    print(f"Running ABFE analysis for {ligand_path}")
-
-    analyzer = ABFEAnalyzer(
-        project_root=ligand_path,
-        abfe_replicates=n_replicates,
-        temperature=298.0  # Optional: change if your simulation was at a different T
-    )
-    analyzer.run()
-```
-
-
-## H.A.W.T.O.W.N console
-
-Track runs, inspect incidents and view cluster history. Keep the registry and
-reports outside simulation directories.
-
-```bash
-REGISTRY="$HOME/.local/state/abflow/campaign.sqlite"
-python -m abfe.campaign --registry "$REGISTRY" init \
-  --manifest examples/membrane-campaign.json --source-root /absolute/path/to/orexin
-python -m abfe.campaign --registry "$REGISTRY" scan
-python -m abfe.campaign --registry "$REGISTRY" status
-python -m abfe.campaign --registry "$REGISTRY" report --output /tmp/hawtown.html
-```
-
-Open the report in a browser. Refresh cluster observations with `check-connections`,
-or collect history and refresh reports with:
-
-```bash
-python -m abfe.campaign --registry "$REGISTRY" sample-clusters --publish-dir /absolute/console-directory
-```
-
-## Local analysis
-
-Run on **absolut** using stable local DHDL files in place. Outputs are saved under
-`<registry-directory>/analyses/<analysis-id>/`.
-
-```bash
-conda activate abflow_v2
-RUN="deflorian-set1/OX2_48845/complex/3"
-python -m abfe.campaign --registry "$REGISTRY" analyse "$RUN" --cutoff-ns 16 --plan
-python -m abfe.campaign --registry "$REGISTRY" analyse "$RUN" --cutoff-ns 16
-python -m abfe.campaign --registry "$REGISTRY" decide "$RUN"
-python -m abfe.campaign --registry "$REGISTRY" import-analysis piersanti/A2A_14/complex/1 --plan
-python -m abfe.campaign --registry "$REGISTRY" bind "$RUN" --compatibility /absolute/review.json
-```
-
-Both legs use a 16 ns minimum, a 10 ps discard and an absolute MBAR half-difference
-<0.5 kcal/mol. Proposed targets use `min(analysed_cutoff_ns + 5, 50)`.
-See [CONTEXT.md](CONTEXT.md) for provenance and solvent compatibility review details.
-
-Run the focused tests, including the scientific integration check:
-
-```bash
-ABFLOW_SCIENTIFIC_TEST=1 python -m unittest \
-  abfe.tests.test_analysis abfe.tests.test_campaign \
-  abfe.tests.test_cluster_capacity abfe.tests.test_cluster_monitor
-```
-
-## Cluster execution
-
-Copy `examples/execution-gpu.json` or `examples/execution-archer.json` and replace the
-source, executable, concurrency and storage estimates with reviewed values.
-Profiles that load modules generate a Bash login shell so initialization does not
-depend on the environment inherited from the submitting SSH session.
-ABFlow runs on the workstation: it copies the bundle with rsync, verifies checksums,
-calls `sbatch` over SSH and records the returned job ID. The generated `job.sh` runs
-GROMACS directly; no Python runner is copied or started on the cluster. Native
-checkpoints and small checksum/status files support continuation and retrieval.
-Existing worker-based plans remain historical records; create a new plan to use
-the plain scripts. Scientific targets, window schedules and convergence rules are unchanged.
-
-```bash
-python -m abfe.campaign --registry "$REGISTRY" cluster-plan "$RUN" --manifest /absolute/execution.json
-python -m abfe.campaign --registry "$REGISTRY" cluster-action ACTION_ID --operation stage
-python -m abfe.campaign --registry "$REGISTRY" cluster-action ACTION_ID --operation stage --apply
-python -m abfe.campaign --registry "$REGISTRY" cluster-action ACTION_ID --operation submit --apply
-python -m abfe.campaign --registry "$REGISTRY" cluster-action ACTION_ID --operation monitor
-python -m abfe.campaign --registry "$REGISTRY" cluster-action ACTION_ID --operation retrieve --output /absolute/new/snapshot --apply
-```
-
-Workloads: `vanilla`, `complex-equilibration` (FEP windows), `solvent`,
-`complex-production` (ARCHER HREX only). Modes: `initial`, `continue`, `extend`.
-Plans/scripts are saved beside the registry under `executions/ACTION_ID/`.
-Retrieval preserves a separate snapshot; it does not replace registered source runs.
+Folder `__init__.py` files expose existing Python entry points; implementations live
+in the named modules. Scientific resources keep their existing package paths.

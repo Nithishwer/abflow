@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "authorization": "REPLACE with the actual user authorization reference; this example grants no permission",
+  "max_submitted": {"ranvier": 1},
+  "runs": [
+    {
+      "run_id": "DATASET/LIGAND/vanilla/1",
+      "operations": ["plan", "stage", "submit", "monitor", "retrieve", "map-source"],
+      "manifest": "/absolute/reviewed-execution.json",
+      "retrieval_output": "/absolute/new/retrieval"
+    }
+  ]
+}

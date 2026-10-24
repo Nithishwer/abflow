@@ -1,0 +1,22 @@
+{
+  "modules": {
+    "__init__.py": "949cb6c67ffb9b2a8b48b59760ebd2660cfd62f7985b0459ae31315de1c6a976",
+    "combine.py": "f0574129454e986a80997e3b1535161621fda313069b5f0b8db831650232f8fe",
+    "convergence.py": "6304c4b49534098ca538abf6b08a622317c7eea2ceb04ee57d1d2544df078018",
+    "estimate.py": "d8c1ddc11f3029065f847511c8b434b05639d956feecb43d5e2c671465fa5d36",
+    "fingerprints.py": "3bb5d1f883570dd8ee5cdc37a366c21000eba7535d5c46ac781638a733b365d4",
+    "history.py": "19c1176595afa9105299260e8bc73fb60b731823c858234992a2561e06f1c653",
+    "identity.py": "93cdc6beda7082b03214fe2e5b732184f2df079afde9b33647f65ce5f4bc9814",
+    "incidents.py": "e516f020cf1f575dd51a515c767844d57b7b55fc3f8faf920ea75d44cba0cafc",
+    "inputs.py": "dcfc1514f68a71e6da9867b6ad10655cf5da07808e0fb00548820ffd67751ada",
+    "policy.py": "a5cda222a9cf2432787c336eb33055e02ea5fa4b3c61265b0ba4f22d28951355",
+    "provenance.py": "501deebf200a9d5c7131f2dd185066a187be14ec3b99adf73da052b257d666db",
+    "records.py": "af0c9861810c7c28809d229558eeadb1cf6b1cae34ddda87b6ccde3648a0e62c",
+    "run.py": "b726fd67928fe167defa413fec5f71baf217d55eee10f20e4572d46502898ac4",
+    "values.py": "0bc1ed38dd18fcd3f1f18c2bd3d9ca391e500ef3425a4acd210ce7ad7a1ade37",
+    "view.py": "ffed2de642c1326e9e3334686d19d1c6c00c3847d807b3e96ece3994f9a3a4f3"
+  },
+  "previous_sha256": "838bb61d9886ad9853aa2ba6facf053a239b242c8d4d4bbddbb752025dd0a0db",
+  "reason": "User-requested single-purpose folder layout; scientific rules unchanged",
+  "schema_version": 1
+}

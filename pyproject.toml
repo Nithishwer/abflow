@@ -14,11 +14,12 @@ dependencies = [
     "MDAnalysis",
     "openff-toolkit",
     "numpy",
-    "scipy"
+    "scipy",
+    "PyYAML"
 ]
 
 [project.scripts]
-abflow-campaign = "abfe.campaign:main"
+abflow = "abfe.commands.main:main"
 
 [tool.setuptools]
 include-package-data = true
@@ -28,7 +29,7 @@ where = ["."]
 include = ["abfe*"]
 
 [tool.setuptools.package-data]
-"abfe" = ["analysis_protocol.json", "console_assets/*.css", "console_assets/*.ttf", "console_assets/*LICENSE.txt"]
+"abfe" = ["analysis_protocol.json", "console_assets/*.css", "console_assets/*.js", "console_assets/*.ttf", "console_assets/*LICENSE.txt"]
 "abfe.utils" = ["water_deletor.pl"]
 
 # Include all .sh files in all subfolders of job_script_template
@@ -43,3 +44,5 @@ include = ["abfe*"]
 # Include everything in ligand_only
 "abfe.utils.data.ligand_only" = ["**/*"]
 
+
+"abfe.analysis" = ["source-migration.json"]

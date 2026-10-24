@@ -5,3 +5,8 @@ abfe/tests/test_data/
 .abflow/
 __pycache__/
 .pytest_cache/
+
+# Generated packaging output
+*.egg-info/
+build/
+dist/
